@@ -1,0 +1,5 @@
+User-Agent: *
+Allow: /
+
+Host: https://sukruefendihotel.com
+Sitemap: https://sukruefendihotel.com/sitemap.xml
