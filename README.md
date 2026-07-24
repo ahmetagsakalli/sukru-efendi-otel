@@ -1,12 +1,48 @@
 # Şükrü Efendi Ottoman Hotel
 
-This repository is a static mirror of the Vercel deployment at:
+Next.js App Router projesi. Site Vercel'de yayındaki Şükrü Efendi Ottoman Hotel tasarımından kaynak proje olarak yeniden kuruldu.
 
-https://sukru-efendi-hotel-site.vercel.app/
+## Komutlar
 
-It includes the prerendered HTML pages, local image/font/CSS assets, and a small static script for the mobile menu and hero service rotator.
+```bash
+npm install
+npm run dev
+```
 
-## Pages
+Geliştirme adresi: `http://localhost:3000`
+
+## Production
+
+```bash
+npm install
+npm run build
+npm start
+```
+
+VPS'de PM2 ile çalıştırmak için:
+
+```bash
+pm2 start npm --name sukru-efendi-otel -- start
+pm2 save
+```
+
+## Standalone Çıktı
+
+`next.config.js` içinde `output: "standalone"` açık. Daha küçük deploy için build sonrası şu klasörler sunucuya taşınabilir:
+
+```bash
+.next/standalone
+.next/static
+public
+```
+
+Sonra:
+
+```bash
+node .next/standalone/server.js
+```
+
+## Sayfalar
 
 - `/`
 - `/odalar`
@@ -16,11 +52,3 @@ It includes the prerendered HTML pages, local image/font/CSS assets, and a small
 - `/tarihce`
 - `/galeri`
 - `/iletisim`
-
-## Local Preview
-
-```bash
-python3 -m http.server 3000
-```
-
-Then open `http://localhost:3000`.

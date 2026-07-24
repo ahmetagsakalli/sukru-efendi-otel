@@ -1,45 +1,6 @@
 {
-  "cleanUrls": true,
-  "trailingSlash": false,
-  "headers": [
-    {
-      "source": "/_next/static/(.*)",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=31536000, immutable"
-        }
-      ]
-    }
-  ],
-  "rewrites": [
-    {
-      "source": "/odalar",
-      "destination": "/odalar/index.html"
-    },
-    {
-      "source": "/odalar/standart-oda",
-      "destination": "/odalar/standart-oda/index.html"
-    },
-    {
-      "source": "/odalar/suit-oda",
-      "destination": "/odalar/suit-oda/index.html"
-    },
-    {
-      "source": "/odalar/aile-odalari",
-      "destination": "/odalar/aile-odalari/index.html"
-    },
-    {
-      "source": "/tarihce",
-      "destination": "/tarihce/index.html"
-    },
-    {
-      "source": "/galeri",
-      "destination": "/galeri/index.html"
-    },
-    {
-      "source": "/iletisim",
-      "destination": "/iletisim/index.html"
-    }
-  ]
+  "framework": "nextjs",
+  "installCommand": "npm install",
+  "buildCommand": "npm run build",
+  "devCommand": "npm run dev"
 }
