@@ -1,14 +1,27 @@
+"use client";
+
+import { usePathname } from "next/navigation";
 import {
   defaultLocale,
+  getHomeHref,
+  getLocaleFromPathname,
   getPublicCopy,
   localizeSiteContent,
   type PublicLocale
 } from "@/lib/i18n";
-import { getSiteContent } from "@/lib/site-content";
+import type { SiteContent } from "@/lib/site-content-schema";
 
-export async function FloatingContacts({ locale = defaultLocale }: { locale?: PublicLocale }) {
-  const { site } = localizeSiteContent(await getSiteContent(), locale);
-  const copy = getPublicCopy(locale);
+export function FloatingContacts({
+  content,
+  locale = defaultLocale
+}: {
+  content: SiteContent;
+  locale?: PublicLocale;
+}) {
+  const pathname = usePathname() ?? getHomeHref(locale);
+  const activeLocale = getLocaleFromPathname(pathname);
+  const { site } = localizeSiteContent(content, activeLocale);
+  const copy = getPublicCopy(activeLocale);
 
   return (
     <div className="floating-contact-actions" aria-label={copy.floating.aria}>

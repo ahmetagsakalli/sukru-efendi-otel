@@ -8,6 +8,7 @@ import { useEffect, useState } from "react";
 import {
   defaultLocale,
   getBookingHref,
+  getLocaleFromPathname,
   getHomeHref,
   getLanguageSwitchHref,
   getPublicCopy,
@@ -22,16 +23,17 @@ export function Header({ locale = defaultLocale }: { locale?: PublicLocale }) {
   const [isOpen, setIsOpen] = useState(false);
   const [isLanguageOpen, setIsLanguageOpen] = useState(false);
   const pathname = usePathname() ?? getHomeHref(locale);
-  const copy = getPublicCopy(locale);
+  const activeLocale = getLocaleFromPathname(pathname) ?? locale;
+  const copy = getPublicCopy(activeLocale);
   const navItems = [
-    { href: getRouteHref(locale, "rooms"), label: copy.nav.rooms },
-    { href: getServicesHref(locale), label: copy.nav.services },
-    { href: getRouteHref(locale, "history"), label: copy.nav.history },
-    { href: getRouteHref(locale, "gallery"), label: copy.nav.gallery },
-    { href: getRouteHref(locale, "contact"), label: copy.nav.contact }
+    { href: getRouteHref(activeLocale, "rooms"), label: copy.nav.rooms },
+    { href: getServicesHref(activeLocale), label: copy.nav.services },
+    { href: getRouteHref(activeLocale, "history"), label: copy.nav.history },
+    { href: getRouteHref(activeLocale, "gallery"), label: copy.nav.gallery },
+    { href: getRouteHref(activeLocale, "contact"), label: copy.nav.contact }
   ];
   const languageAria =
-    locale === "en" ? "Language selector" : locale === "de" ? "Sprachauswahl" : "Dil seçimi";
+    activeLocale === "en" ? "Language selector" : activeLocale === "de" ? "Sprachauswahl" : "Dil seçimi";
 
   useEffect(() => {
     document.body.classList.toggle("menu-open", isOpen);
@@ -41,6 +43,10 @@ export function Header({ locale = defaultLocale }: { locale?: PublicLocale }) {
   useEffect(() => {
     setIsLanguageOpen(false);
   }, [pathname]);
+
+  useEffect(() => {
+    document.documentElement.lang = activeLocale;
+  }, [activeLocale]);
 
   useEffect(() => {
     if (!isLanguageOpen) return undefined;
@@ -77,7 +83,7 @@ export function Header({ locale = defaultLocale }: { locale?: PublicLocale }) {
           aria-haspopup="menu"
           onClick={() => setIsLanguageOpen((value) => !value)}
         >
-          <span>{localeLabels[locale].short}</span>
+          <span>{localeLabels[activeLocale].short}</span>
           <ChevronDown aria-hidden="true" className="language-select__icon" size={15} strokeWidth={2.2} />
         </button>
         <div id={id} className="language-select__menu" role="menu" hidden={!isLanguageOpen}>
@@ -85,7 +91,7 @@ export function Header({ locale = defaultLocale }: { locale?: PublicLocale }) {
             <Link
               key={item}
               href={getLanguageSwitchHref(pathname, item)}
-              aria-current={item === locale ? "true" : undefined}
+              aria-current={item === activeLocale ? "true" : undefined}
               aria-label={localeLabels[item].aria}
               role="menuitem"
               onClick={() => {
@@ -105,7 +111,7 @@ export function Header({ locale = defaultLocale }: { locale?: PublicLocale }) {
   return (
     <>
       <header className="site-header">
-        <Link className="brand-mark" aria-label={copy.nav.home} href={getHomeHref(locale)}>
+        <Link className="brand-mark" aria-label={copy.nav.home} href={getHomeHref(activeLocale)}>
           <Image
             src="/brand/sukru-efendi-logo.webp"
             alt="Şükrü Efendi Ottoman Hotel"
@@ -124,7 +130,7 @@ export function Header({ locale = defaultLocale }: { locale?: PublicLocale }) {
             ))}
           </nav>
           {renderLanguageSelect()}
-          <Link className="booking-link booking-link--solid site-header__booking" href={getBookingHref(locale)}>
+          <Link className="booking-link booking-link--solid site-header__booking" href={getBookingHref(activeLocale)}>
             {copy.nav.booking}
           </Link>
         </div>
@@ -156,7 +162,7 @@ export function Header({ locale = defaultLocale }: { locale?: PublicLocale }) {
         ))}
         <Link
           className="booking-link booking-link--solid"
-          href={getBookingHref(locale)}
+          href={getBookingHref(activeLocale)}
           onClick={() => setIsOpen(false)}
         >
           {copy.nav.booking}

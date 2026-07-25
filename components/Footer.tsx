@@ -1,25 +1,32 @@
+"use client";
+
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import {
   defaultLocale,
   getBookingHref,
+  getHomeHref,
+  getLocaleFromPathname,
   getPublicCopy,
   getRouteHref,
   getServicesHref,
   localizeSiteContent,
   type PublicLocale
 } from "@/lib/i18n";
-import { getSiteContent } from "@/lib/site-content";
+import type { SiteContent } from "@/lib/site-content-schema";
 
-export async function Footer({ locale = defaultLocale }: { locale?: PublicLocale }) {
-  const content = localizeSiteContent(await getSiteContent(), locale);
+export function Footer({ content: baseContent, locale = defaultLocale }: { content: SiteContent; locale?: PublicLocale }) {
+  const pathname = usePathname() ?? getHomeHref(locale);
+  const activeLocale = getLocaleFromPathname(pathname);
+  const content = localizeSiteContent(baseContent, activeLocale);
   const { site } = content;
-  const copy = getPublicCopy(locale);
+  const copy = getPublicCopy(activeLocale);
   const navItems = [
-    { href: getRouteHref(locale, "rooms"), label: copy.nav.rooms },
-    { href: getServicesHref(locale), label: copy.nav.services },
-    { href: getRouteHref(locale, "history"), label: copy.nav.history },
-    { href: getRouteHref(locale, "gallery"), label: copy.nav.gallery },
-    { href: getRouteHref(locale, "contact"), label: copy.nav.contact }
+    { href: getRouteHref(activeLocale, "rooms"), label: copy.nav.rooms },
+    { href: getServicesHref(activeLocale), label: copy.nav.services },
+    { href: getRouteHref(activeLocale, "history"), label: copy.nav.history },
+    { href: getRouteHref(activeLocale, "gallery"), label: copy.nav.gallery },
+    { href: getRouteHref(activeLocale, "contact"), label: copy.nav.contact }
   ];
 
   return (
@@ -42,7 +49,7 @@ export async function Footer({ locale = defaultLocale }: { locale?: PublicLocale
           <a href={site.mapHref} target="_blank" rel="noreferrer">
             {copy.footer.openMap}
           </a>
-          <Link className="booking-link booking-link--outline" href={getBookingHref(locale)}>
+          <Link className="booking-link booking-link--outline" href={getBookingHref(activeLocale)}>
             {copy.nav.booking}
           </Link>
         </div>

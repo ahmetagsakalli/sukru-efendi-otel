@@ -99,18 +99,19 @@ export const viewport: Viewport = {
   ]
 };
 
-export default function RootLayout({ children }: { children: ReactNode }) {
+export default async function RootLayout({ children }: { children: ReactNode }) {
   const pathname = headers().get("x-pathname") ?? "";
   const isAdminRoute = pathname.startsWith("/admin") || pathname.startsWith("/dashboard");
   const locale = getLocaleFromPathname(pathname);
+  const content = isAdminRoute ? null : await getSiteContent();
 
   return (
     <html lang={locale}>
       <body className={`${bodyFont.variable} ${headingFont.variable} ${accentFont.variable}`}>
         {isAdminRoute ? null : <Header locale={locale} />}
         <main>{children}</main>
-        {isAdminRoute ? null : <Footer locale={locale} />}
-        {isAdminRoute ? null : <FloatingContacts locale={locale} />}
+        {content ? <Footer content={content} locale={locale} /> : null}
+        {content ? <FloatingContacts content={content} locale={locale} /> : null}
       </body>
     </html>
   );
