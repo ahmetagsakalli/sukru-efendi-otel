@@ -8,10 +8,14 @@ import {
   ArrowUp,
   BedDouble,
   CalendarCheck,
+  Clock3,
+  ClipboardList,
   Copy,
+  FileText,
   GalleryHorizontal,
   Hotel,
   ImageIcon,
+  Inbox,
   KeyRound,
   ListChecks,
   LogOut,
@@ -20,11 +24,13 @@ import {
   Plus,
   RefreshCw,
   Save,
+  Search,
   Settings,
   Trash2,
-  Upload
+  Upload,
+  Users
 } from "lucide-react";
-import { formatBookingCurrency } from "@/lib/booking";
+import { formatBookingCurrency, getGuestCount, getRoomAvailability, getRoomCapacityLimit } from "@/lib/booking";
 import type { ReservationRequest, ReservationStatus } from "@/lib/reservation-schema";
 import type { AdminImage, GalleryItem, Room, RoomFeature, SiteContent } from "@/lib/site-content-schema";
 
@@ -34,7 +40,18 @@ type AdminDashboardProps = {
   initialReservations: ReservationRequest[];
 };
 
-type AdminTab = "overview" | "reservations" | "rooms" | "gallery" | "services" | "settings" | "images";
+type AdminTab =
+  | "dashboard"
+  | "rooms"
+  | "reservations"
+  | "guests"
+  | "inbox"
+  | "history"
+  | "content"
+  | "gallery"
+  | "services"
+  | "images"
+  | "settings";
 
 type AdminReservationDraft = {
   checkIn: string;
@@ -50,14 +67,31 @@ type AdminReservationDraft = {
   status: ReservationStatus;
 };
 
+type GuestProfile = {
+  key: string;
+  name: string;
+  phone: string;
+  email: string;
+  reservationCount: number;
+  confirmedCount: number;
+  totalSpend: number;
+  lastActivity: string;
+  roomTitles: string[];
+  isComplete: boolean;
+};
+
 const tabs: Array<{ id: AdminTab; label: string; icon: ReactNode }> = [
-  { id: "overview", label: "Genel", icon: <Hotel size={18} /> },
-  { id: "reservations", label: "Rezervasyonlar", icon: <CalendarCheck size={18} /> },
-  { id: "rooms", label: "Odalar", icon: <BedDouble size={18} /> },
-  { id: "gallery", label: "Galeri", icon: <GalleryHorizontal size={18} /> },
-  { id: "services", label: "Hizmetler", icon: <ListChecks size={18} /> },
-  { id: "settings", label: "Ayarlar", icon: <Settings size={18} /> },
-  { id: "images", label: "Görseller", icon: <ImageIcon size={18} /> }
+  { id: "dashboard", label: "Dashboard", icon: <ClipboardList size={18} /> },
+  { id: "rooms", label: "Rooms", icon: <BedDouble size={18} /> },
+  { id: "reservations", label: "Reservations", icon: <CalendarCheck size={18} /> },
+  { id: "guests", label: "Guests", icon: <Users size={18} /> },
+  { id: "inbox", label: "Inbox", icon: <Inbox size={18} /> },
+  { id: "history", label: "History", icon: <Clock3 size={18} /> },
+  { id: "content", label: "Site Content", icon: <FileText size={18} /> },
+  { id: "gallery", label: "Gallery", icon: <GalleryHorizontal size={18} /> },
+  { id: "services", label: "Services", icon: <ListChecks size={18} /> },
+  { id: "images", label: "Media", icon: <ImageIcon size={18} /> },
+  { id: "settings", label: "Settings", icon: <Settings size={18} /> }
 ];
 
 function replaceItem<T>(items: T[], index: number, item: T) {
@@ -99,6 +133,77 @@ function formatFileSize(size: number) {
   return `${(size / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+function formatDateLabel(value: string) {
+  const date = new Date(value.includes("T") ? value : `${value}T00:00:00`);
+
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return new Intl.DateTimeFormat("tr-TR", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric"
+  }).format(date);
+}
+
+function formatDateTimeLabel(value: string) {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return new Intl.DateTimeFormat("tr-TR", {
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    month: "short"
+  }).format(date);
+}
+
+function getGuestProfileKey(reservation: ReservationRequest) {
+  const email = reservation.email?.trim().toLocaleLowerCase("tr-TR");
+  const phone = reservation.phone.replace(/\D/g, "");
+  const name = reservation.name.trim().toLocaleLowerCase("tr-TR");
+  return email || phone || name || reservation.id;
+}
+
+function buildGuestProfiles(reservations: ReservationRequest[]) {
+  const profiles = new Map<string, GuestProfile>();
+
+  reservations.forEach((reservation) => {
+    const key = getGuestProfileKey(reservation);
+    const existing = profiles.get(key);
+    const rooms = new Set(existing?.roomTitles ?? []);
+    rooms.add(reservation.roomTitle);
+
+    profiles.set(key, {
+      key,
+      name: existing?.name || reservation.name,
+      phone: existing?.phone || reservation.phone,
+      email: existing?.email || reservation.email || "",
+      reservationCount: (existing?.reservationCount ?? 0) + 1,
+      confirmedCount: (existing?.confirmedCount ?? 0) + (reservation.status === "confirmed" ? 1 : 0),
+      totalSpend: (existing?.totalSpend ?? 0) + (reservation.status === "cancelled" ? 0 : reservation.estimatedTotal),
+      lastActivity:
+        existing && existing.lastActivity > reservation.updatedAt ? existing.lastActivity : reservation.updatedAt,
+      roomTitles: Array.from(rooms),
+      isComplete: Boolean((existing?.email || reservation.email) && (existing?.phone || reservation.phone))
+    });
+  });
+
+  return Array.from(profiles.values()).sort((a, b) => b.lastActivity.localeCompare(a.lastActivity));
+}
+
+function getStatusTone(status: ReservationStatus) {
+  if (status === "confirmed") return "success";
+  if (status === "cancelled") return "danger";
+  if (status === "archived") return "muted";
+  if (status === "contacted") return "warning";
+  return "info";
+}
+
 const reservationStatusLabels: Record<ReservationStatus, string> = {
   new: "Yeni",
   contacted: "Görüşüldü",
@@ -109,6 +214,10 @@ const reservationStatusLabels: Record<ReservationStatus, string> = {
 
 const MAX_CLIENT_UPLOAD_SIZE = 10 * 1024 * 1024;
 const acceptedUploadTypes = new Set(["image/jpeg", "image/png", "image/webp", "image/avif"]);
+
+function isUploadedImagePath(src: string) {
+  return src.startsWith("/uploads/") && src.endsWith(".webp");
+}
 
 function validateImageFile(file: File) {
   if (!acceptedUploadTypes.has(file.type)) {
@@ -164,18 +273,89 @@ function createReservationDraft(rooms: Room[]): AdminReservationDraft {
   };
 }
 
+type ReservationPreviewInput = Pick<
+  AdminReservationDraft | ReservationRequest,
+  "adults" | "checkIn" | "checkOut" | "children" | "roomSlug" | "status"
+>;
+
+function clampNumber(value: number, min: number, max: number) {
+  if (!Number.isFinite(value)) return min;
+  return Math.min(Math.max(value, min), max);
+}
+
+function constrainReservationGuests<T extends { adults: number; children: number; roomSlug: string }>(input: T, rooms: Room[]): T {
+  const room = rooms.find((item) => item.slug === input.roomSlug);
+
+  if (!room) {
+    return input;
+  }
+
+  const capacityLimit = Math.max(getRoomCapacityLimit(room), 1);
+  const adults = clampNumber(input.adults, 1, capacityLimit);
+  const children = clampNumber(input.children, 0, Math.max(capacityLimit - adults, 0));
+  return { ...input, adults, children };
+}
+
+function getReservationPreview({
+  excludeReservationId,
+  input,
+  reservations,
+  rooms
+}: {
+  excludeReservationId?: string;
+  input: ReservationPreviewInput;
+  reservations: ReservationRequest[];
+  rooms: Room[];
+}) {
+  const room = rooms.find((item) => item.slug === input.roomSlug);
+
+  if (!room) {
+    return {
+      availability: null,
+      capacityLimit: 0,
+      error: "Oda bulunamadı.",
+      guestCount: getGuestCount(input.adults, input.children),
+      room: null
+    };
+  }
+
+  const capacityLimit = getRoomCapacityLimit(room);
+  const guestCount = getGuestCount(input.adults, input.children);
+  const availability = getRoomAvailability(room, reservations, input.checkIn, input.checkOut, excludeReservationId);
+  const dateError = !input.checkIn || !input.checkOut || input.checkOut <= input.checkIn ? "Çıkış tarihi girişten sonra olmalı." : "";
+  const occupancyError =
+    guestCount > capacityLimit ? `${room.title} için en fazla ${capacityLimit} misafir seçilebilir.` : "";
+  const availabilityError =
+    !dateError && input.status === "confirmed" && !availability.isAvailable
+      ? "Onaylı kayıt için bu tarih aralığında müsait oda yok."
+      : "";
+
+  return {
+    availability,
+    capacityLimit,
+    error: dateError || occupancyError || availabilityError,
+    guestCount,
+    room
+  };
+}
+
 export function AdminDashboard({ initialContent, initialImages, initialReservations }: AdminDashboardProps) {
   const router = useRouter();
   const [content, setContent] = useState(initialContent);
   const [images, setImages] = useState(initialImages);
   const [reservations, setReservations] = useState(initialReservations);
   const [newReservation, setNewReservation] = useState<AdminReservationDraft>(() => createReservationDraft(initialContent.rooms));
-  const [activeTab, setActiveTab] = useState<AdminTab>("overview");
+  const [activeTab, setActiveTab] = useState<AdminTab>("dashboard");
   const [selectedRoomIndex, setSelectedRoomIndex] = useState(0);
+  const [roomSearch, setRoomSearch] = useState("");
+  const [reservationSearch, setReservationSearch] = useState("");
+  const [reservationStatusFilter, setReservationStatusFilter] = useState<"all" | ReservationStatus>("all");
+  const [guestSearch, setGuestSearch] = useState("");
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState<"success" | "error">("success");
   const [isSaving, setIsSaving] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [deletingImageSrc, setDeletingImageSrc] = useState<string | null>(null);
   const [isCreatingReservation, setIsCreatingReservation] = useState(false);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [updatingReservationId, setUpdatingReservationId] = useState<string | null>(null);
@@ -186,20 +366,46 @@ export function AdminDashboard({ initialContent, initialImages, initialReservati
   });
 
   const selectedRoom = content.rooms[Math.min(selectedRoomIndex, content.rooms.length - 1)];
-  const stats = useMemo(() => {
-    const totalRooms = content.rooms.reduce((sum, room) => sum + room.count, 0);
-    const newReservations = reservations.filter((reservation) => reservation.status === "new").length;
+  const guestProfiles = useMemo(() => buildGuestProfiles(reservations), [reservations]);
+  const activeReservations = useMemo(
+    () => reservations.filter((reservation) => reservation.status !== "archived"),
+    [reservations]
+  );
+  const inboxReservations = useMemo(
+    () =>
+      reservations.filter(
+        (reservation) => reservation.source === "website" && ["new", "contacted"].includes(reservation.status)
+      ),
+    [reservations]
+  );
+  const dashboardMetrics = useMemo(() => {
     const confirmedReservations = reservations.filter((reservation) => reservation.status === "confirmed");
+    const cancelledReservations = reservations.filter((reservation) => reservation.status === "cancelled");
     const confirmedRevenue = confirmedReservations.reduce((sum, reservation) => sum + reservation.estimatedTotal, 0);
+    const totalRoomInventory = content.rooms.reduce((sum, room) => sum + room.count, 0);
+    const bookedRoomNights = confirmedReservations.reduce((sum, reservation) => sum + reservation.nights, 0);
+    const averageStay = confirmedReservations.length ? Math.round(bookedRoomNights / confirmedReservations.length) : 0;
+
+    return {
+      averageStay,
+      bookedRoomNights,
+      cancelledReservations: cancelledReservations.length,
+      confirmedReservations: confirmedReservations.length,
+      confirmedRevenue,
+      newRequests: reservations.filter((reservation) => reservation.status === "new").length,
+      totalRoomInventory
+    };
+  }, [content.rooms, reservations]);
+  const stats = useMemo(() => {
     return [
-      { label: "Toplam oda", value: totalRooms },
-      { label: "Yeni talep", value: newReservations },
-      { label: "Onaylı", value: confirmedReservations.length },
-      { label: "Tahmini gelir", value: formatBookingCurrency(confirmedRevenue) },
+      { label: "Toplam oda", value: dashboardMetrics.totalRoomInventory },
+      { label: "Yeni talep", value: dashboardMetrics.newRequests },
+      { label: "Onaylı", value: dashboardMetrics.confirmedReservations },
+      { label: "Tahmini gelir", value: formatBookingCurrency(dashboardMetrics.confirmedRevenue) },
       { label: "Oda tipi", value: content.rooms.length },
-      { label: "Görsel", value: images.length }
+      { label: "Misafir", value: guestProfiles.length }
     ];
-  }, [content.galleryItems.length, content.rooms, images.length, reservations]);
+  }, [content.rooms.length, dashboardMetrics, guestProfiles.length]);
 
   function flash(type: "success" | "error", text: string) {
     setMessageType(type);
@@ -306,6 +512,73 @@ export function AdminDashboard({ initialContent, initialImages, initialReservati
     );
   }
 
+  function getImageUsageCount(src: string, candidateContent: SiteContent = content) {
+    if (!src) return 0;
+
+    let count = 0;
+    const track = (value: string) => {
+      if (value === src) count += 1;
+    };
+
+    track(candidateContent.pages.home.heroImage);
+    track(candidateContent.pages.home.historyImage);
+    track(candidateContent.pages.history.image);
+    candidateContent.galleryItems.forEach((item) => track(item.image));
+    candidateContent.rooms.forEach((room) => {
+      track(room.image);
+      room.gallery.forEach(track);
+    });
+
+    return count;
+  }
+
+  async function deleteImage(image: AdminImage) {
+    if (!isUploadedImagePath(image.src)) {
+      flash("error", "Bu görsel proje görseli. Kalıcı silinmez; ilgili alandan başka görsel seçebilirsin.");
+      return;
+    }
+
+    const usageCount = getImageUsageCount(image.src);
+
+    if (usageCount > 0) {
+      flash("error", `Bu görsel ${usageCount} yerde kullanılıyor. Önce ilgili alanlardan kaldır veya başka görselle değiştir.`);
+      return;
+    }
+
+    if (!window.confirm(`${image.name} kalıcı olarak silinsin mi?`)) return;
+
+    setDeletingImageSrc(image.src);
+    setMessage("");
+
+    try {
+      const response = await fetch("/api/admin/images", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ src: image.src })
+      });
+      const result = (await response.json().catch(() => ({}))) as { images?: AdminImage[]; error?: string };
+
+      if (handleUnauthorized(response)) return;
+
+      if (!response.ok) {
+        if (response.status === 409) {
+          flash("error", "Bu görsel kayıtlı içerikte kullanılıyor. Önce ilgili alanı değiştirip Kaydet, sonra tekrar sil.");
+          return;
+        }
+
+        flash("error", result.error ?? "Görsel silinemedi.");
+        return;
+      }
+
+      setImages((current) => result.images ?? current.filter((item) => item.src !== image.src));
+      flash("success", `${image.src} silindi.`);
+    } catch {
+      flash("error", "Görsel silinemedi. Bağlantıyı kontrol edip tekrar deneyin.");
+    } finally {
+      setDeletingImageSrc(null);
+    }
+  }
+
   async function uploadAndSelectImage(file: File) {
     try {
       const image = await uploadAdminImage(file);
@@ -348,7 +621,7 @@ export function AdminDashboard({ initialContent, initialImages, initialReservati
         next.checkOut = addDays(value, 1);
       }
 
-      return next;
+      return constrainReservationGuests(next, content.rooms);
     });
   }
 
@@ -432,17 +705,14 @@ export function AdminDashboard({ initialContent, initialImages, initialReservati
     }
   }
 
-  async function updateReservation(id: string) {
-    const reservation = reservations.find((item) => item.id === id);
-    if (!reservation) return;
-
-    setUpdatingReservationId(id);
+  async function submitReservationUpdate(reservation: ReservationRequest) {
+    setUpdatingReservationId(reservation.id);
     try {
       const response = await fetch("/api/admin/reservations", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          id,
+          id: reservation.id,
           adults: reservation.adults,
           checkIn: reservation.checkIn,
           checkOut: reservation.checkOut,
@@ -468,7 +738,7 @@ export function AdminDashboard({ initialContent, initialImages, initialReservati
         return;
       }
 
-      setReservations((current) => current.map((item) => (item.id === id ? result.reservation! : item)));
+      setReservations((current) => current.map((item) => (item.id === reservation.id ? result.reservation! : item)));
       flash("success", "Rezervasyon güncellendi.");
     } catch {
       flash("error", "Rezervasyon güncellenemedi. Bağlantıyı kontrol edin.");
@@ -477,9 +747,26 @@ export function AdminDashboard({ initialContent, initialImages, initialReservati
     }
   }
 
+  async function updateReservation(id: string) {
+    const reservation = reservations.find((item) => item.id === id);
+    if (!reservation) return;
+    await submitReservationUpdate(reservation);
+  }
+
+  async function updateReservationStatus(id: string, status: ReservationStatus) {
+    const reservation = reservations.find((item) => item.id === id);
+    if (!reservation) return;
+
+    const updated = constrainReservationGuests({ ...reservation, status }, content.rooms);
+    setReservations((current) => current.map((item) => (item.id === id ? updated : item)));
+    await submitReservationUpdate(updated);
+  }
+
   function updateReservationLocal(id: string, patch: Partial<ReservationRequest>) {
     setReservations((current) =>
-      current.map((reservation) => (reservation.id === id ? { ...reservation, ...patch } : reservation))
+      current.map((reservation) =>
+        reservation.id === id ? constrainReservationGuests({ ...reservation, ...patch }, content.rooms) : reservation
+      )
     );
   }
 
@@ -600,6 +887,21 @@ export function AdminDashboard({ initialContent, initialImages, initialReservati
     updateRoom(roomIndex, { ...room, gallery: replaceItem(room.gallery, imageIndex, value) });
   }
 
+  function removeRoomGalleryImage(roomIndex: number, imageIndex: number) {
+    const room = content.rooms[roomIndex];
+    if (!room) return;
+
+    if (room.gallery.length <= 1) {
+      flash("error", "Oda galerisinde en az bir görsel kalmalı. Mevcut görseli değiştirebilirsin.");
+      return;
+    }
+
+    updateRoom(roomIndex, {
+      ...room,
+      gallery: room.gallery.filter((_, currentIndex) => currentIndex !== imageIndex)
+    });
+  }
+
   function updateRoomAmenity(roomIndex: number, amenityIndex: number, value: string) {
     const room = content.rooms[roomIndex];
     if (!room) return;
@@ -613,6 +915,18 @@ export function AdminDashboard({ initialContent, initialImages, initialReservati
     }));
   }
 
+  function removeGalleryItem(index: number) {
+    if (content.galleryItems.length <= 1) {
+      flash("error", "Galeride en az bir görsel kalmalı. Mevcut görseli değiştirebilirsin.");
+      return;
+    }
+
+    setContent((current) => ({
+      ...current,
+      galleryItems: current.galleryItems.filter((_, currentIndex) => currentIndex !== index)
+    }));
+  }
+
   function updateFeature(index: number, feature: RoomFeature) {
     setContent((current) => ({
       ...current,
@@ -620,7 +934,154 @@ export function AdminDashboard({ initialContent, initialImages, initialReservati
     }));
   }
 
-  function renderOverview() {
+  function renderDashboard() {
+    const recentReservations = reservations.slice(0, 6);
+    const recentActivity = reservations
+      .slice()
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+      .slice(0, 6);
+
+    return (
+      <div className="admin-section-stack">
+        <section className="admin-dashboard-hero">
+          <div>
+            <p className="admin-kicker">Booking Management System</p>
+            <h2>{content.site.shortName} operasyon paneli</h2>
+            <span>
+              Odalar, fiyatlar, rezervasyon talepleri, misafirler ve site içeriği tek panelden yönetiliyor.
+            </span>
+          </div>
+          <div className="admin-dashboard-hero__actions">
+            <button className="admin-primary-button" type="button" onClick={() => setActiveTab("reservations")}>
+              <Plus size={16} />
+              Rezervasyon
+            </button>
+            <button className="admin-secondary-button" type="button" onClick={() => setActiveTab("rooms")}>
+              <BedDouble size={16} />
+              Odalar
+            </button>
+          </div>
+        </section>
+
+        <div className="admin-dashboard-grid">
+          <section className="admin-panel-section admin-dashboard-card admin-dashboard-card--wide">
+            <div className="admin-section-heading">
+              <div>
+                <h2>Son rezervasyonlar</h2>
+                <span>Web ve admin kayıtları</span>
+              </div>
+              <button className="admin-secondary-button" type="button" onClick={() => setActiveTab("reservations")}>
+                Tümünü aç
+              </button>
+            </div>
+            {recentReservations.length ? (
+              <div className="admin-data-table">
+                <div className="admin-data-table__head admin-data-table__row--reservations">
+                  <span>Misafir</span>
+                  <span>Oda</span>
+                  <span>Tarih</span>
+                  <span>Durum</span>
+                  <span>Tutar</span>
+                </div>
+                {recentReservations.map((reservation) => (
+                  <div className="admin-data-table__row admin-data-table__row--reservations" key={reservation.id}>
+                    <span>
+                      <strong>{reservation.name}</strong>
+                      <small>{reservation.phone}</small>
+                    </span>
+                    <span>{reservation.roomTitle}</span>
+                    <span>
+                      {formatDateLabel(reservation.checkIn)} - {formatDateLabel(reservation.checkOut)}
+                    </span>
+                    <span>
+                      <StatusBadge status={reservation.status} />
+                    </span>
+                    <span>{formatBookingCurrency(reservation.estimatedTotal, reservation.currency)}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="admin-empty-state">Henüz rezervasyon kaydı yok.</div>
+            )}
+          </section>
+
+          <section className="admin-panel-section admin-dashboard-card">
+            <div className="admin-section-heading">
+              <div>
+                <h2>Oda doluluğu</h2>
+                <span>Onaylı rezervasyonlara göre</span>
+              </div>
+            </div>
+            <div className="admin-occupancy-list">
+              {content.rooms.map((room) => {
+                const confirmedForRoom = reservations.filter(
+                  (reservation) => reservation.roomSlug === room.slug && reservation.status === "confirmed"
+                );
+                const bookedNights = confirmedForRoom.reduce((sum, reservation) => sum + reservation.nights, 0);
+                const fill = Math.min(100, Math.round((bookedNights / Math.max(room.count * 30, 1)) * 100));
+
+                return (
+                  <div className="admin-occupancy-item" key={room.slug}>
+                    <div>
+                      <strong>{room.title}</strong>
+                      <span>{room.count} oda / {bookedNights} gece</span>
+                    </div>
+                    <div className="admin-progress" aria-label={`${room.title} doluluk`}>
+                      <span style={{ width: `${fill}%` }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+
+          <section className="admin-panel-section admin-dashboard-card">
+            <div className="admin-section-heading">
+              <div>
+                <h2>Inbox</h2>
+                <span>Yanıt bekleyen web talepleri</span>
+              </div>
+              <button className="admin-secondary-button" type="button" onClick={() => setActiveTab("inbox")}>
+                Aç
+              </button>
+            </div>
+            <div className="admin-activity-list">
+              {inboxReservations.slice(0, 5).map((reservation) => (
+                <button className="admin-activity-item" key={reservation.id} type="button" onClick={() => setActiveTab("inbox")}>
+                  <strong>{reservation.name}</strong>
+                  <span>{reservation.roomTitle} · {formatDateLabel(reservation.createdAt)}</span>
+                </button>
+              ))}
+              {inboxReservations.length === 0 ? <div className="admin-empty-state">Bekleyen talep yok.</div> : null}
+            </div>
+          </section>
+
+          <section className="admin-panel-section admin-dashboard-card">
+            <div className="admin-section-heading">
+              <div>
+                <h2>Aktivite</h2>
+                <span>Son güncellemeler</span>
+              </div>
+              <button className="admin-secondary-button" type="button" onClick={() => setActiveTab("history")}>
+                History
+              </button>
+            </div>
+            <div className="admin-activity-list">
+              {recentActivity.map((reservation) => (
+                <div className="admin-activity-item" key={reservation.id}>
+                  <strong>{reservationStatusLabels[reservation.status]} · {reservation.name}</strong>
+                  <span>{formatDateTimeLabel(reservation.updatedAt)}</span>
+                </div>
+              ))}
+              {recentActivity.length === 0 ? <div className="admin-empty-state">Henüz aktivite yok.</div> : null}
+            </div>
+          </section>
+        </div>
+      </div>
+    );
+  }
+
+  function renderContent() {
     return (
       <div className="admin-section-stack">
         <section className="admin-panel-section" data-testid="admin-section-site">
@@ -709,9 +1170,32 @@ export function AdminDashboard({ initialContent, initialImages, initialReservati
   }
 
   function renderReservations() {
-    const activeReservations = reservations.filter((reservation) => reservation.status !== "archived");
-    const archivedCount = reservations.length - activeReservations.length;
     const roomOptions = content.rooms.map((room) => [room.slug, room.title] as [string, string]);
+    const newReservationPreview = getReservationPreview({
+      input: newReservation,
+      reservations,
+      rooms: content.rooms
+    });
+    const newReservationMaxChildren = Math.max(newReservationPreview.capacityLimit - newReservation.adults, 0);
+    const normalizedSearch = reservationSearch.trim().toLocaleLowerCase("tr-TR");
+    const filteredReservations = reservations.filter((reservation) => {
+      if (reservationStatusFilter !== "all" && reservation.status !== reservationStatusFilter) return false;
+      if (!normalizedSearch) return reservation.status !== "archived";
+
+      const haystack = [
+        reservation.name,
+        reservation.phone,
+        reservation.email,
+        reservation.roomTitle,
+        reservation.checkIn,
+        reservation.checkOut
+      ]
+        .join(" ")
+        .toLocaleLowerCase("tr-TR");
+
+      return haystack.includes(normalizedSearch);
+    });
+    const archivedCount = reservations.length - activeReservations.length;
 
     return (
       <section className="admin-panel-section" data-testid="admin-section-reservations">
@@ -724,6 +1208,31 @@ export function AdminDashboard({ initialContent, initialImages, initialReservati
             <RefreshCw size={16} />
             Yenile
           </button>
+        </div>
+        <div className="admin-toolbar">
+          <label className="admin-search-field">
+            <Search size={16} />
+            <input
+              aria-label="Rezervasyonlarda ara"
+              placeholder="Misafir, telefon, oda veya tarih ara"
+              type="search"
+              value={reservationSearch}
+              onChange={(event) => setReservationSearch(event.target.value)}
+            />
+          </label>
+          <select
+            aria-label="Rezervasyon durumu filtresi"
+            className="admin-filter-select"
+            value={reservationStatusFilter}
+            onChange={(event) => setReservationStatusFilter(event.target.value as "all" | ReservationStatus)}
+          >
+            <option value="all">Aktif kayıtlar</option>
+            {Object.entries(reservationStatusLabels).map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
         </div>
         <div className="admin-reservation-create" data-testid="admin-create-reservation-form">
           <div className="admin-list-heading">
@@ -757,18 +1266,31 @@ export function AdminDashboard({ initialContent, initialImages, initialReservati
               onChange={(value) => updateNewReservationField("status", value as ReservationStatus)}
               options={Object.entries(reservationStatusLabels)}
             />
-            <NumberField label="Yetişkin" min={1} max={8} value={newReservation.adults} onChange={(value) => updateNewReservationField("adults", value)} />
-            <NumberField label="Çocuk" min={0} max={8} value={newReservation.children} onChange={(value) => updateNewReservationField("children", value)} />
+            <NumberField
+              label="Yetişkin"
+              min={1}
+              max={Math.max(newReservationPreview.capacityLimit, 1)}
+              value={newReservation.adults}
+              onChange={(value) => updateNewReservationField("adults", value)}
+            />
+            <NumberField
+              label="Çocuk"
+              min={0}
+              max={newReservationMaxChildren}
+              value={newReservation.children}
+              onChange={(value) => updateNewReservationField("children", value)}
+            />
             <TextField label="Ad Soyad" value={newReservation.name} onChange={(value) => updateNewReservationField("name", value)} />
             <TextField label="Telefon" type="tel" value={newReservation.phone} onChange={(value) => updateNewReservationField("phone", value)} />
             <TextField label="E-posta" type="email" value={newReservation.email} onChange={(value) => updateNewReservationField("email", value)} />
             <TextArea label="Misafir notu" value={newReservation.note} onChange={(value) => updateNewReservationField("note", value)} />
             <TextArea label="Admin notu" value={newReservation.adminNote} onChange={(value) => updateNewReservationField("adminNote", value)} />
           </div>
+          <ReservationAvailabilityPreview preview={newReservationPreview} />
           <button
             className="admin-primary-button"
             data-testid="admin-create-reservation"
-            disabled={isCreatingReservation}
+            disabled={isCreatingReservation || Boolean(newReservationPreview.error)}
             type="button"
             onClick={createReservation}
           >
@@ -776,12 +1298,21 @@ export function AdminDashboard({ initialContent, initialImages, initialReservati
             {isCreatingReservation ? "Oluşturuluyor" : "Rezervasyon Oluştur"}
           </button>
         </div>
-        {activeReservations.length === 0 ? (
+        {filteredReservations.length === 0 ? (
           <div className="admin-empty-state">Henüz rezervasyon kaydı yok.</div>
         ) : (
           <div className="admin-reservation-board">
-            {activeReservations.map((reservation) => (
-              <article className={`admin-reservation-card admin-reservation-card--${reservation.status}`} key={reservation.id}>
+            {filteredReservations.map((reservation) => {
+              const reservationPreview = getReservationPreview({
+                excludeReservationId: reservation.id,
+                input: reservation,
+                reservations,
+                rooms: content.rooms
+              });
+              const reservationMaxChildren = Math.max(reservationPreview.capacityLimit - reservation.adults, 0);
+
+              return (
+                <article className={`admin-reservation-card admin-reservation-card--${reservation.status}`} key={reservation.id}>
                 <div className="admin-reservation-card__top">
                   <div>
                     <strong>{reservation.name}</strong>
@@ -802,6 +1333,7 @@ export function AdminDashboard({ initialContent, initialImages, initialReservati
                   </span>
                 </div>
                 {reservation.note ? <p className="admin-reservation-note">{reservation.note}</p> : null}
+                <ReservationAvailabilityPreview compact preview={reservationPreview} />
                 <div className="admin-reservation-actions">
                   <a className="admin-secondary-button" href={`tel:${reservation.phone.replace(/\s/g, "")}`}>
                     <PhoneCall size={15} />
@@ -844,8 +1376,20 @@ export function AdminDashboard({ initialContent, initialImages, initialReservati
                     value={reservation.checkOut}
                     onChange={(value) => updateReservationLocal(reservation.id, { checkOut: value })}
                   />
-                  <NumberField label="Yetişkin" min={1} max={8} value={reservation.adults} onChange={(value) => updateReservationLocal(reservation.id, { adults: value })} />
-                  <NumberField label="Çocuk" min={0} max={8} value={reservation.children} onChange={(value) => updateReservationLocal(reservation.id, { children: value })} />
+                  <NumberField
+                    label="Yetişkin"
+                    min={1}
+                    max={Math.max(reservationPreview.capacityLimit, 1)}
+                    value={reservation.adults}
+                    onChange={(value) => updateReservationLocal(reservation.id, { adults: value })}
+                  />
+                  <NumberField
+                    label="Çocuk"
+                    min={0}
+                    max={reservationMaxChildren}
+                    value={reservation.children}
+                    onChange={(value) => updateReservationLocal(reservation.id, { children: value })}
+                  />
                   <TextField label="Ad Soyad" value={reservation.name} onChange={(value) => updateReservationLocal(reservation.id, { name: value })} />
                   <TextField label="Telefon" type="tel" value={reservation.phone} onChange={(value) => updateReservationLocal(reservation.id, { phone: value })} />
                   <TextField label="E-posta" type="email" value={reservation.email ?? ""} onChange={(value) => updateReservationLocal(reservation.id, { email: value })} />
@@ -862,31 +1406,307 @@ export function AdminDashboard({ initialContent, initialImages, initialReservati
                 </div>
                 <button
                   className="admin-primary-button"
-                  disabled={updatingReservationId === reservation.id}
+                  disabled={updatingReservationId === reservation.id || Boolean(reservationPreview.error)}
                   type="button"
                   onClick={() => updateReservation(reservation.id)}
                 >
                   {updatingReservationId === reservation.id ? "Güncelleniyor" : "Rezervasyonu Kaydet"}
                 </button>
-              </article>
-            ))}
+                </article>
+              );
+            })}
           </div>
         )}
       </section>
     );
   }
 
+  function renderGuests() {
+    const normalizedSearch = guestSearch.trim().toLocaleLowerCase("tr-TR");
+    const filteredGuests = guestProfiles.filter((guest) => {
+      if (!normalizedSearch) return true;
+      return [guest.name, guest.phone, guest.email, guest.roomTitles.join(" ")]
+        .join(" ")
+        .toLocaleLowerCase("tr-TR")
+        .includes(normalizedSearch);
+    });
+
+    return (
+      <section className="admin-panel-section" data-testid="admin-section-guests">
+        <div className="admin-section-heading">
+          <div>
+            <h2>Guests</h2>
+            <span>Rezervasyonlardan oluşturulan misafir profilleri</span>
+          </div>
+          <button className="admin-secondary-button" type="button" onClick={() => setActiveTab("reservations")}>
+            <Plus size={16} />
+            Rezervasyon ekle
+          </button>
+        </div>
+        <div className="admin-toolbar">
+          <label className="admin-search-field">
+            <Search size={16} />
+            <input
+              aria-label="Misafirlerde ara"
+              placeholder="Ad, telefon, e-posta veya oda ara"
+              type="search"
+              value={guestSearch}
+              onChange={(event) => setGuestSearch(event.target.value)}
+            />
+          </label>
+        </div>
+        {filteredGuests.length ? (
+          <div className="admin-data-table">
+            <div className="admin-data-table__head admin-data-table__row--guests">
+              <span>Misafir</span>
+              <span>İletişim</span>
+              <span>Rezervasyon</span>
+              <span>Profil</span>
+              <span>Aksiyon</span>
+            </div>
+            {filteredGuests.map((guest) => (
+              <div className="admin-data-table__row admin-data-table__row--guests" key={guest.key}>
+                <span>
+                  <strong>{guest.name}</strong>
+                  <small>{guest.roomTitles.slice(0, 2).join(", ")}</small>
+                </span>
+                <span>
+                  <strong>{guest.phone}</strong>
+                  <small>{guest.email || "E-posta yok"}</small>
+                </span>
+                <span>
+                  <strong>{guest.reservationCount} kayıt</strong>
+                  <small>{formatBookingCurrency(guest.totalSpend)} toplam</small>
+                </span>
+                <span>
+                  <span className={`admin-status-badge admin-status-badge--${guest.isComplete ? "success" : "warning"}`}>
+                    {guest.isComplete ? "Tamamlandı" : "Eksik"}
+                  </span>
+                </span>
+                <span className="admin-table-actions">
+                  <a className="admin-secondary-button" href={`tel:${guest.phone.replace(/\s/g, "")}`}>
+                    <PhoneCall size={15} />
+                    Ara
+                  </a>
+                  <button
+                    className="admin-secondary-button"
+                    type="button"
+                    onClick={() => {
+                      setReservationSearch(guest.name);
+                      setReservationStatusFilter("all");
+                      setActiveTab("reservations");
+                    }}
+                  >
+                    Kayıtlar
+                  </button>
+                </span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="admin-empty-state">Bu aramayla misafir bulunamadı.</div>
+        )}
+      </section>
+    );
+  }
+
+  function renderInbox() {
+    return (
+      <section className="admin-panel-section" data-testid="admin-section-inbox">
+        <div className="admin-section-heading">
+          <div>
+            <h2>Inbox</h2>
+            <span>Web sitesinden gelen yeni ve görüşülen talepler</span>
+          </div>
+          <button className="admin-secondary-button" type="button" onClick={refreshReservations}>
+            <RefreshCw size={16} />
+            Yenile
+          </button>
+        </div>
+        {inboxReservations.length ? (
+          <div className="admin-inbox-list">
+            {inboxReservations.map((reservation) => (
+              <article className="admin-inbox-item" key={reservation.id}>
+                <div className="admin-inbox-item__main">
+                  <div>
+                    <strong>{reservation.name}</strong>
+                    <span>{reservation.roomTitle} · {formatDateLabel(reservation.checkIn)} - {formatDateLabel(reservation.checkOut)}</span>
+                  </div>
+                  <StatusBadge status={reservation.status} />
+                </div>
+                <p>{reservation.note || "Misafir not bırakmadı."}</p>
+                <div className="admin-inbox-item__meta">
+                  <span>{reservation.nights} gece</span>
+                  <span>{reservation.adults + reservation.children} misafir</span>
+                  <span>{formatBookingCurrency(reservation.estimatedTotal, reservation.currency)}</span>
+                  <span>{formatDateTimeLabel(reservation.createdAt)}</span>
+                </div>
+                <div className="admin-inline-actions">
+                  <a className="admin-secondary-button" href={`tel:${reservation.phone.replace(/\s/g, "")}`}>
+                    <PhoneCall size={15} />
+                    Ara
+                  </a>
+                  {reservation.email ? (
+                    <a className="admin-secondary-button" href={`mailto:${reservation.email}`}>
+                      <Mail size={15} />
+                      E-posta
+                    </a>
+                  ) : null}
+                  <button
+                    className="admin-secondary-button"
+                    disabled={updatingReservationId === reservation.id}
+                    type="button"
+                    onClick={() => updateReservationStatus(reservation.id, "contacted")}
+                  >
+                    Görüşüldü
+                  </button>
+                  <button
+                    className="admin-primary-button"
+                    disabled={updatingReservationId === reservation.id}
+                    type="button"
+                    onClick={() => updateReservationStatus(reservation.id, "confirmed")}
+                  >
+                    Onayla
+                  </button>
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <div className="admin-empty-state">Yanıt bekleyen web talebi yok.</div>
+        )}
+      </section>
+    );
+  }
+
+  function renderHistory() {
+    const activity = reservations
+      .slice()
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+      .slice(0, 24);
+
+    return (
+      <div className="admin-section-stack">
+        <section className="admin-panel-section" data-testid="admin-section-history">
+          <div className="admin-section-heading">
+            <div>
+              <h2>History</h2>
+              <span>Rezervasyon hareketleri ve içerik tarihçesi</span>
+            </div>
+          </div>
+          {activity.length ? (
+            <div className="admin-activity-list admin-activity-list--timeline">
+              {activity.map((reservation) => (
+                <div className="admin-activity-item" key={reservation.id}>
+                  <strong>{reservationStatusLabels[reservation.status]} · {reservation.name}</strong>
+                  <span>
+                    {reservation.roomTitle} · {formatDateLabel(reservation.checkIn)} - {formatDateLabel(reservation.checkOut)} ·{" "}
+                    {formatDateTimeLabel(reservation.updatedAt)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="admin-empty-state">Henüz rezervasyon hareketi yok.</div>
+          )}
+        </section>
+        <section className="admin-panel-section" data-testid="admin-section-history-content">
+          <div className="admin-section-heading">
+            <div>
+              <h2>Site tarihçesi</h2>
+              <span>Tarihçe sayfasında görünen içerik</span>
+            </div>
+          </div>
+          <div className="admin-form-grid">
+            <TextField
+              label="Tarihçe başlığı"
+              value={content.pages.history.title}
+              onChange={(value) => updateHistoryPageField("title", value)}
+            />
+            <TextArea
+              label="Tarihçe metni"
+              value={content.pages.history.body}
+              onChange={(value) => updateHistoryPageField("body", value)}
+            />
+            <ImagePicker
+              images={images}
+              label="Tarihçe görseli"
+              onUpload={uploadAndSelectImage}
+              testId="image-picker-history"
+              value={content.pages.history.image}
+              onChange={(value) => updateHistoryPageField("image", value)}
+            />
+          </div>
+          <EditableStringList
+            addLabel="Satır ekle"
+            items={content.pages.history.timeline}
+            label="Tarihçe satırları"
+            onAdd={() =>
+              setContent((current) => ({
+                ...current,
+                pages: {
+                  ...current.pages,
+                  history: {
+                    ...current.pages.history,
+                    timeline: [...current.pages.history.timeline, "Yeni tarihçe satırı"]
+                  }
+                }
+              }))
+            }
+            onChange={updateHistoryTimeline}
+            onRemove={(index) =>
+              setContent((current) => ({
+                ...current,
+                pages: {
+                  ...current.pages,
+                  history: {
+                    ...current.pages.history,
+                    timeline: current.pages.history.timeline.filter((_, currentIndex) => currentIndex !== index)
+                  }
+                }
+              }))
+            }
+          />
+        </section>
+      </div>
+    );
+  }
+
   function renderRooms() {
+    const normalizedSearch = roomSearch.trim().toLocaleLowerCase("tr-TR");
+    const visibleRooms = content.rooms
+      .map((room, index) => ({ index, room }))
+      .filter(({ room }) => {
+        if (!normalizedSearch) return true;
+        return [room.title, room.slug, room.price, room.capacity, room.bed]
+          .join(" ")
+          .toLocaleLowerCase("tr-TR")
+          .includes(normalizedSearch);
+      });
+
     return (
       <div className="admin-rooms-layout">
         <aside className="admin-room-list">
           <div className="admin-list-heading">
-            <strong>Oda tipleri</strong>
+            <div>
+              <strong>Oda tipleri</strong>
+              <span>{content.rooms.length} oda tipi yönetiliyor</span>
+            </div>
             <button className="admin-icon-button" title="Oda ekle" type="button" onClick={addRoom}>
               <Plus size={17} />
             </button>
           </div>
-          {content.rooms.map((room, index) => (
+          <label className="admin-search-field admin-search-field--compact">
+            <Search size={15} />
+            <input
+              aria-label="Odalarda ara"
+              placeholder="Oda ara"
+              type="search"
+              value={roomSearch}
+              onChange={(event) => setRoomSearch(event.target.value)}
+            />
+          </label>
+          {visibleRooms.map(({ room, index }) => (
             <button
               className={`admin-room-tab${selectedRoom?.slug === room.slug ? " is-active" : ""}`}
               key={`${room.slug}-${index}`}
@@ -894,9 +1714,10 @@ export function AdminDashboard({ initialContent, initialImages, initialReservati
               type="button"
             >
               <span>{room.title}</span>
-              <small>{room.price}</small>
+              <small>{room.price} · {room.count} oda · {room.capacity}</small>
             </button>
           ))}
+          {visibleRooms.length === 0 ? <div className="admin-empty-state">Bu aramayla oda bulunamadı.</div> : null}
         </aside>
         {selectedRoom ? (
           <section className="admin-panel-section" data-testid="admin-section-room-editor">
@@ -1034,14 +1855,10 @@ export function AdminDashboard({ initialContent, initialImages, initialReservati
                   />
                   <button
                     className="admin-icon-button"
+                    data-testid={`room-gallery-remove-${index}`}
                     title="Sil"
                     type="button"
-                    onClick={() =>
-                      updateRoom(selectedRoomIndex, {
-                        ...selectedRoom,
-                        gallery: selectedRoom.gallery.filter((_, currentIndex) => currentIndex !== index)
-                      })
-                    }
+                    onClick={() => removeRoomGalleryImage(selectedRoomIndex, index)}
                   >
                     <Trash2 size={16} />
                   </button>
@@ -1120,14 +1937,10 @@ export function AdminDashboard({ initialContent, initialImages, initialReservati
                 </button>
                 <button
                   className="admin-icon-button admin-icon-button--danger"
+                  data-testid={`gallery-item-remove-${index}`}
                   title="Sil"
                   type="button"
-                  onClick={() =>
-                    setContent((current) => ({
-                      ...current,
-                      galleryItems: current.galleryItems.filter((_, currentIndex) => currentIndex !== index)
-                    }))
-                  }
+                  onClick={() => removeGalleryItem(index)}
                 >
                   <Trash2 size={16} />
                 </button>
@@ -1427,23 +2240,40 @@ export function AdminDashboard({ initialContent, initialImages, initialReservati
           </label>
         </div>
         <div className="admin-image-grid">
-          {images.map((image) => (
-            <article className="admin-image-tile" key={image.src}>
-              <ImagePreview alt={image.name} src={image.src} />
-              <div>
-                <strong>{image.name}</strong>
-                <small>{formatFileSize(image.size)}</small>
-              </div>
-              <button
-                className="admin-secondary-button"
-                type="button"
-                onClick={() => copyImagePath(image.src)}
-              >
-                <Copy size={15} />
-                Yolu kopyala
-              </button>
-            </article>
-          ))}
+          {images.map((image) => {
+            const usageCount = getImageUsageCount(image.src);
+            const usageText = usageCount > 0 ? `${usageCount} yerde kullanılıyor` : "Kullanılmıyor";
+
+            return (
+              <article className="admin-image-tile" key={image.src}>
+                <ImagePreview alt={image.name} src={image.src} />
+                <div className="admin-image-tile__meta">
+                  <strong>{image.name}</strong>
+                  <small>{formatFileSize(image.size)} · {usageText}</small>
+                </div>
+                <div className="admin-image-tile__actions">
+                  <button
+                    className="admin-secondary-button"
+                    type="button"
+                    onClick={() => copyImagePath(image.src)}
+                  >
+                    <Copy size={15} />
+                    Yolu kopyala
+                  </button>
+                  <button
+                    className="admin-danger-button"
+                    disabled={deletingImageSrc === image.src}
+                    title={isUploadedImagePath(image.src) ? "Görseli kalıcı sil" : "Proje görseli kalıcı silinmez"}
+                    type="button"
+                    onClick={() => deleteImage(image)}
+                  >
+                    <Trash2 size={15} />
+                    {deletingImageSrc === image.src ? "Siliniyor" : "Sil"}
+                  </button>
+                </div>
+              </article>
+            );
+          })}
         </div>
       </section>
     );
@@ -1456,9 +2286,10 @@ export function AdminDashboard({ initialContent, initialImages, initialReservati
           <span>ŞE</span>
           <div>
             <strong>Şükrü Efendi</strong>
-            <small>Content Admin</small>
+            <small>Booking Admin</small>
           </div>
         </div>
+        <p className="admin-nav-label">Pages</p>
         <nav className="admin-nav" aria-label="Admin menü">
           {tabs.map((tab) => (
             <button
@@ -1477,7 +2308,7 @@ export function AdminDashboard({ initialContent, initialImages, initialReservati
       <section className="admin-workspace">
         <header className="admin-topbar">
           <div>
-            <p className="admin-kicker">Dashboard</p>
+            <p className="admin-kicker">Admin Panel</p>
             <h1>{tabs.find((tab) => tab.id === activeTab)?.label}</h1>
           </div>
           <div className="admin-topbar-actions">
@@ -1506,14 +2337,64 @@ export function AdminDashboard({ initialContent, initialImages, initialReservati
           ))}
         </div>
         {message ? <p className={`admin-alert admin-alert--${messageType}`}>{message}</p> : null}
-        {activeTab === "overview" ? renderOverview() : null}
-        {activeTab === "reservations" ? renderReservations() : null}
+        {activeTab === "dashboard" ? renderDashboard() : null}
         {activeTab === "rooms" ? renderRooms() : null}
+        {activeTab === "reservations" ? renderReservations() : null}
+        {activeTab === "guests" ? renderGuests() : null}
+        {activeTab === "inbox" ? renderInbox() : null}
+        {activeTab === "history" ? renderHistory() : null}
+        {activeTab === "content" ? renderContent() : null}
         {activeTab === "gallery" ? renderGallery() : null}
         {activeTab === "services" ? renderServices() : null}
-        {activeTab === "settings" ? renderSettings() : null}
         {activeTab === "images" ? renderImages() : null}
+        {activeTab === "settings" ? renderSettings() : null}
       </section>
+    </div>
+  );
+}
+
+type ReservationPreview = ReturnType<typeof getReservationPreview>;
+
+function StatusBadge({ status }: { status: ReservationStatus }) {
+  return (
+    <span className={`admin-status-badge admin-status-badge--${getStatusTone(status)}`}>
+      {reservationStatusLabels[status]}
+    </span>
+  );
+}
+
+function ReservationAvailabilityPreview({ compact = false, preview }: { compact?: boolean; preview: ReservationPreview }) {
+  const availability = preview.availability;
+
+  if (!availability) {
+    return <div className="admin-reservation-preview admin-reservation-preview--warning">Oda bilgisi bulunamadı.</div>;
+  }
+
+  const className = [
+    "admin-reservation-preview",
+    compact ? "admin-reservation-preview--compact" : "",
+    preview.error || !availability.isAvailable ? "admin-reservation-preview--warning" : ""
+  ]
+    .filter(Boolean)
+    .join(" ");
+  const availabilityLabel = availability.isAvailable
+    ? `${availability.availableRooms}/${availability.totalRooms} oda müsait`
+    : "Onaylanırsa çakışır";
+
+  return (
+    <div className={className}>
+      <div>
+        <strong>{preview.error || availabilityLabel}</strong>
+        <span>
+          {availability.nights} gece · {formatBookingCurrency(availability.estimatedTotal, availability.currency)}
+        </span>
+      </div>
+      <div>
+        <strong>
+          {preview.guestCount}/{preview.capacityLimit} misafir
+        </strong>
+        <span>{availability.pricePerNight > 0 ? `${formatBookingCurrency(availability.pricePerNight, availability.currency)} / gece` : "Fiyat girilmemiş"}</span>
+      </div>
     </div>
   );
 }

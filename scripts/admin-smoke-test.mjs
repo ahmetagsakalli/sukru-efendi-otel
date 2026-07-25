@@ -177,6 +177,11 @@ async function expectUploadedAssetIsServed(page, publicPath) {
   expect(assetResponse.status(), `${publicPath} was not served as a public asset`).toBe(200);
 }
 
+async function expectUploadedAssetIsDeleted(page, publicPath) {
+  const assetResponse = await page.request.get(`${baseURL}${publicPath}`);
+  expect(assetResponse.status(), `${publicPath} should be deleted from public assets`).toBe(404);
+}
+
 async function uploadWithPickerRoot(page, root, filePath) {
   const [response] = await Promise.all([
     page.waitForResponse((candidate) => candidate.url().endsWith("/api/admin/images") && candidate.request().method() === "POST"),
@@ -289,6 +294,25 @@ async function checkPublicReservationValidation(page) {
   const invalidEmailJson = await invalidEmail.json();
   expect(invalidEmailJson.issues?.[0]?.message).toBe("E-posta adresi geçersiz.");
 
+  const overCapacity = await page.request.post(`${baseURL}/api/reservations`, {
+    data: {
+      checkIn: "2026-08-01",
+      checkOut: "2026-08-03",
+      roomSlug: "suit-oda",
+      adults: 4,
+      children: 0,
+      name: "Smoke Over Capacity",
+      phone: "+90 555 100 20 30",
+      email: "capacity@example.com",
+      note: "",
+      website: ""
+    }
+  });
+
+  expect(overCapacity.status()).toBe(400);
+  const overCapacityJson = await overCapacity.json();
+  expect(overCapacityJson.error).toContain("en fazla 3 misafir");
+
   const honeypot = await page.request.post(`${baseURL}/api/reservations`, {
     data: {
       checkIn: "2026-08-01",
@@ -308,8 +332,8 @@ async function checkPublicReservationValidation(page) {
 }
 
 async function checkOverview(page, imagePath, iteration) {
-  await page.getByTestId("admin-tab-overview").click();
-  await expect(page.getByRole("heading", { level: 1, name: "Genel" })).toBeVisible();
+  await page.getByTestId("admin-tab-content").click();
+  await expect(page.getByRole("heading", { level: 1, name: "Site Content" })).toBeVisible();
 
   const hotelInfo = page.getByTestId("admin-section-site");
   await hotelInfo.getByLabel("Otel adı").fill(`Smoke Otel ${iteration}`);
@@ -322,10 +346,53 @@ async function checkOverview(page, imagePath, iteration) {
   await uploadWithPicker(page, "image-picker-home-hero", imagePath);
 }
 
+async function checkDashboardShell(page) {
+  await page.goto(`${baseURL}/dashboard`);
+  await expect(page.getByTestId("admin-dashboard")).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Dashboard" })).toBeVisible();
+  await page.getByTestId("admin-tab-guests").click();
+  await expect(page.getByRole("heading", { level: 1, name: "Guests" })).toBeVisible();
+  await page.getByTestId("admin-tab-inbox").click();
+  await expect(page.getByRole("heading", { level: 1, name: "Inbox" })).toBeVisible();
+  await page.getByTestId("admin-tab-history").click();
+  await expect(page.getByRole("heading", { level: 1, name: "History" })).toBeVisible();
+  await page.getByTestId("admin-tab-dashboard").click();
+}
+
 async function checkReservations(page, iteration) {
   await createReservation(page, iteration);
   await page.getByTestId("admin-tab-reservations").click();
+  await expect(page.getByRole("heading", { level: 1, name: "Reservations" })).toBeVisible();
   await page.getByRole("button", { name: "Yenile" }).click();
+
+  const adminOverCapacity = await page.evaluate(async (payload) => {
+    const response = await fetch("/api/admin/reservations", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+
+    return {
+      json: await response.json().catch(() => ({})),
+      status: response.status
+    };
+  }, {
+      checkIn: "2026-08-20",
+      checkOut: "2026-08-22",
+      roomSlug: "suit-oda",
+      adults: 4,
+      children: 0,
+      name: `Admin Kapasite ${iteration}`,
+      phone: "+90 555 210 30 40",
+      email: "",
+      note: "",
+      adminNote: "",
+      status: "confirmed"
+  });
+
+  expect(adminOverCapacity.status).toBe(400);
+  expect(adminOverCapacity.json.error).toContain("en fazla 3 misafir");
+
   const card = page.locator(".admin-reservation-card").filter({ hasText: `Smoke Misafir ${iteration}` }).first();
   await expect(card).toBeVisible();
   await card.getByLabel("Durum").selectOption("confirmed");
@@ -390,10 +457,14 @@ async function checkReservations(page, iteration) {
 
 async function checkRooms(page) {
   await page.getByTestId("admin-tab-rooms").click();
-  await expect(page.getByRole("heading", { level: 1, name: "Odalar" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Rooms" })).toBeVisible();
   await page.getByLabel("Fiyat").fill("₺1.234");
+  const roomGalleryPickers = page.locator("div[data-testid^='image-picker-room-gallery-']");
+  const roomGalleryCountBeforeAdd = await roomGalleryPickers.count();
   await page.getByRole("button", { name: "Görsel ekle" }).click();
-  await expect(page.getByText("Galeri 2")).toBeVisible();
+  await expect(roomGalleryPickers).toHaveCount(roomGalleryCountBeforeAdd + 1);
+  await page.getByTestId(`room-gallery-remove-${roomGalleryCountBeforeAdd}`).click();
+  await expect(roomGalleryPickers).toHaveCount(roomGalleryCountBeforeAdd);
   await page.locator("button[title='Oda ekle']").click();
   await expect(page.getByRole("heading", { name: /Yeni Oda/ })).toBeVisible();
   page.once("dialog", (dialog) => dialog.accept());
@@ -402,7 +473,7 @@ async function checkRooms(page) {
 
 async function checkGallery(page, imagePath) {
   await page.getByTestId("admin-tab-gallery").click();
-  await expect(page.getByRole("heading", { level: 1, name: "Galeri" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Gallery" })).toBeVisible();
   const galleryPickers = page.locator("div[data-testid^='image-picker-gallery-']");
   const pickerCountBeforeAdd = await galleryPickers.count();
   await page.getByRole("button", { name: "Görsel ekle" }).click();
@@ -413,12 +484,13 @@ async function checkGallery(page, imagePath) {
   await uploadWithPickerRoot(page, newPicker, imagePath);
   await page.locator("button[title='Aşağı taşı']").first().click();
   await page.locator("button[title='Yukarı taşı']").first().click();
-  await page.locator("button[title='Sil']").last().click();
+  await page.getByTestId(`gallery-item-remove-${pickerCountBeforeAdd}`).click();
+  await expect(galleryPickers).toHaveCount(pickerCountBeforeAdd);
 }
 
 async function checkServices(page) {
   await page.getByTestId("admin-tab-services").click();
-  await expect(page.getByRole("heading", { level: 1, name: "Hizmetler" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Services" })).toBeVisible();
   await page.getByRole("button", { name: "Hizmet ekle" }).click();
   await page.locator(".admin-string-row input").last().fill("Smoke Hizmet");
   await page.getByRole("button", { name: "Özellik ekle" }).click();
@@ -428,7 +500,7 @@ async function checkServices(page) {
 
 async function checkSettings(page, imagePath) {
   await page.getByTestId("admin-tab-settings").click();
-  await expect(page.getByRole("heading", { level: 1, name: "Ayarlar" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Settings" })).toBeVisible();
   const security = page.getByTestId("admin-section-security");
   await security.getByLabel("Mevcut şifre").fill(adminPassword);
   await security.getByLabel("Yeni şifre", { exact: true }).fill(changedAdminPassword);
@@ -449,16 +521,38 @@ async function checkSettings(page, imagePath) {
 
 async function checkImages(page, imagePath, invalidImagePath) {
   await page.getByTestId("admin-tab-images").click();
-  await expect(page.getByRole("heading", { level: 1, name: "Görseller" })).toBeVisible();
-  await uploadToLibrary(page, imagePath);
+  await expect(page.getByRole("heading", { level: 1, name: "Media" })).toBeVisible();
+  const uploaded = await uploadToLibrary(page, imagePath);
+  const uploadedTile = page.locator(".admin-image-tile").filter({ hasText: uploaded.name });
+  await expect(uploadedTile.getByText("Kullanılmıyor")).toBeVisible();
 
-  const [invalidResponse] = await Promise.all([
-    page.waitForResponse((candidate) => candidate.url().endsWith("/api/admin/images") && candidate.request().method() === "POST"),
-    page.getByTestId("image-library-upload").setInputFiles(invalidImagePath)
+  page.once("dialog", (dialog) => dialog.accept());
+  const [deleteResponse] = await Promise.all([
+    page.waitForResponse((candidate) => candidate.url().endsWith("/api/admin/images") && candidate.request().method() === "DELETE"),
+    uploadedTile.getByRole("button", { name: "Sil" }).click()
   ]);
 
-  expect(invalidResponse.status(), "Invalid image upload should be rejected").toBe(400);
-  await expect(page.getByText("Görsel yüklenemedi.")).toBeVisible();
+  expect(deleteResponse.ok(), `Library delete failed with ${deleteResponse.status()}`).toBeTruthy();
+  await expect(page.getByText(`${uploaded.src} silindi.`)).toBeVisible();
+  await expect(uploadedTile).toHaveCount(0);
+  await expectUploadedAssetIsDeleted(page, uploaded.src);
+
+  const invalidResponse = await page.evaluate(async () => {
+    const formData = new FormData();
+    formData.set("file", new File(["not an image"], "admin-smoke-invalid.jpg", { type: "image/jpeg" }));
+    const response = await fetch("/api/admin/images", {
+      method: "POST",
+      body: formData
+    });
+
+    return {
+      json: await response.json().catch(() => ({})),
+      status: response.status
+    };
+  });
+
+  expect(invalidResponse.status, "Invalid image upload should be rejected").toBe(400);
+  expect(invalidResponse.json.error).toBe("Görsel yüklenemedi.");
 }
 
 async function saveAndVerify(page, iteration) {
@@ -529,6 +623,7 @@ async function runIteration(browser, iteration, imageA, imageB, invalidImage) {
   await checkSecurityHeaders(page);
   await checkPublicReservationValidation(page);
   await loginOrSetup(page);
+  await checkDashboardShell(page);
   await checkOverview(page, imageA, iteration);
   await checkReservations(page, iteration);
   await checkRooms(page);

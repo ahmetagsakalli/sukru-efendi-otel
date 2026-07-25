@@ -5,7 +5,8 @@ import sharp from "sharp";
 import { NextRequest, NextResponse } from "next/server";
 import { hasAdminSession } from "@/lib/admin-auth";
 import { checkRateLimit } from "@/lib/rate-limit";
-import { getPublicDirectory, listPublicImages } from "@/lib/site-content";
+import { getPublicDirectory, getSiteContent, listPublicImages } from "@/lib/site-content";
+import { deleteBlobPath, getBlobMetadata, isBlobStorageEnabled, putPublicBlob } from "@/lib/storage";
 
 export const runtime = "nodejs";
 
@@ -15,6 +16,7 @@ const MAX_IMAGE_SIDE = 12_000;
 const OUTPUT_MAX_SIDE = 2200;
 const ACCEPTED_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/avif"]);
 const ACCEPTED_SHARP_FORMATS = new Set(["jpeg", "png", "webp", "avif"]);
+const uploadPathPattern = /^\/uploads\/[A-Za-z0-9._/-]+\.webp$/;
 
 function slugifyFilename(input: string) {
   const withoutExtension = input.replace(/\.[^.]+$/, "") || "gorsel";
@@ -44,6 +46,57 @@ async function requireAdmin() {
 function getClientKey(request: NextRequest) {
   const forwardedFor = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
   return forwardedFor || request.headers.get("x-real-ip") || "local";
+}
+
+function collectSavedImageReferences() {
+  return getSiteContent().then((content) => {
+    const references = new Set<string>();
+
+    references.add(content.pages.home.heroImage);
+    references.add(content.pages.home.historyImage);
+    references.add(content.pages.history.image);
+    content.galleryItems.forEach((item) => references.add(item.image));
+    content.rooms.forEach((room) => {
+      references.add(room.image);
+      room.gallery.forEach((image) => references.add(image));
+    });
+
+    return references;
+  });
+}
+
+function resolveUploadedImagePath(src: string) {
+  if (!uploadPathPattern.test(src) || src.includes("..")) {
+    return null;
+  }
+
+  const publicDirectory = getPublicDirectory();
+  const uploadsDirectory = path.resolve(publicDirectory, "uploads");
+  const absolutePath = path.resolve(publicDirectory, src.slice(1));
+
+  if (!absolutePath.startsWith(`${uploadsDirectory}${path.sep}`)) {
+    return null;
+  }
+
+  return {
+    absolutePath,
+    uploadsDirectory
+  };
+}
+
+async function removeEmptyUploadDirectories(startDirectory: string, uploadsDirectory: string) {
+  let currentDirectory = startDirectory;
+
+  while (currentDirectory.startsWith(uploadsDirectory) && currentDirectory !== uploadsDirectory) {
+    const entries = await fs.readdir(currentDirectory).catch(() => null);
+
+    if (!entries || entries.length > 0) {
+      return;
+    }
+
+    await fs.rmdir(currentDirectory).catch(() => undefined);
+    currentDirectory = path.dirname(currentDirectory);
+  }
 }
 
 export async function GET() {
@@ -105,19 +158,37 @@ export async function POST(request: NextRequest) {
     }
 
     const day = new Date().toISOString().slice(0, 10);
+    const filename = `${slugifyFilename(file.name) || "gorsel"}-${Date.now()}-${crypto.randomUUID().slice(0, 8)}.webp`;
+    const publicPath = `/uploads/${day}/${filename}`;
+    const output = await processor
+      .resize({ width: OUTPUT_MAX_SIDE, height: OUTPUT_MAX_SIDE, fit: "inside", withoutEnlargement: true })
+      .webp({ quality: 82, effort: 5 })
+      .toBuffer();
+
+    if (isBlobStorageEnabled()) {
+      const uploaded = await putPublicBlob(`uploads/${day}/${filename}`, output, "image/webp");
+
+      if (!uploaded) {
+        throw new Error("Blob storage is not configured.");
+      }
+
+      return NextResponse.json({
+        image: {
+          src: publicPath,
+          name: filename,
+          size: output.length,
+          updatedAt: new Date().toISOString()
+        }
+      });
+    }
+
     const uploadDirectory = path.join(getPublicDirectory(), "uploads", day);
     await fs.mkdir(uploadDirectory, { recursive: true });
 
-    const filename = `${slugifyFilename(file.name) || "gorsel"}-${Date.now()}-${crypto.randomUUID().slice(0, 8)}.webp`;
     const absolutePath = path.join(uploadDirectory, filename);
     temporaryPath = `${absolutePath}.tmp-${process.pid}`;
-    const publicPath = `/uploads/${day}/${filename}`;
 
-    await processor
-      .resize({ width: OUTPUT_MAX_SIDE, height: OUTPUT_MAX_SIDE, fit: "inside", withoutEnlargement: true })
-      .webp({ quality: 82, effort: 5 })
-      .toFile(temporaryPath);
-
+    await fs.writeFile(temporaryPath, output);
     await fs.rename(temporaryPath, absolutePath);
 
     const stat = await fs.stat(absolutePath);
@@ -137,5 +208,82 @@ export async function POST(request: NextRequest) {
 
     console.error("admin_image_upload_failed", error);
     return NextResponse.json({ error: "Görsel yüklenemedi." }, { status: 400 });
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  const unauthorized = await requireAdmin();
+  if (unauthorized) return unauthorized;
+
+  const rate = checkRateLimit(`admin-image-delete:${getClientKey(request)}`, 30, 15 * 60 * 1000);
+
+  if (!rate.allowed) {
+    return NextResponse.json(
+      { error: "Çok fazla görsel silme isteği gönderildi. Biraz sonra tekrar deneyin." },
+      { status: 429, headers: { "Retry-After": String(rate.retryAfter) } }
+    );
+  }
+
+  const body = (await request.json().catch(() => null)) as { src?: unknown } | null;
+  const src = typeof body?.src === "string" ? body.src.trim() : "";
+  const resolved = resolveUploadedImagePath(src);
+  const blobPathname = uploadPathPattern.test(src) && !src.includes("..") ? src.slice(1) : null;
+
+  if (!resolved && !(isBlobStorageEnabled() && blobPathname)) {
+    return NextResponse.json({ error: "Sadece panelden yüklenen /uploads altındaki WebP görseller silinebilir." }, { status: 400 });
+  }
+
+  const references = await collectSavedImageReferences();
+
+  if (references.has(src)) {
+    return NextResponse.json(
+      { error: "Bu görsel sitede kullanılıyor. Önce ilgili alanlardan kaldırın veya başka görselle değiştirin." },
+      { status: 409 }
+    );
+  }
+
+  try {
+    if (isBlobStorageEnabled() && blobPathname) {
+      const metadata = await getBlobMetadata(blobPathname);
+
+      if (!metadata) {
+        return NextResponse.json({ error: "Görsel dosyası bulunamadı." }, { status: 404 });
+      }
+
+      await deleteBlobPath(blobPathname);
+      console.info("admin_image_deleted", { src });
+
+      return NextResponse.json({
+        ok: true,
+        images: await listPublicImages()
+      });
+    }
+
+    if (!resolved) {
+      return NextResponse.json({ error: "Görsel dosyası bulunamadı." }, { status: 404 });
+    }
+
+    const stat = await fs.stat(resolved.absolutePath);
+
+    if (!stat.isFile()) {
+      return NextResponse.json({ error: "Görsel dosyası bulunamadı." }, { status: 404 });
+    }
+
+    await fs.rm(resolved.absolutePath, { force: true });
+    await removeEmptyUploadDirectories(path.dirname(resolved.absolutePath), resolved.uploadsDirectory);
+
+    console.info("admin_image_deleted", { src });
+
+    return NextResponse.json({
+      ok: true,
+      images: await listPublicImages()
+    });
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+      return NextResponse.json({ error: "Görsel dosyası bulunamadı." }, { status: 404 });
+    }
+
+    console.error("admin_image_delete_failed", error);
+    return NextResponse.json({ error: "Görsel silinemedi." }, { status: 500 });
   }
 }

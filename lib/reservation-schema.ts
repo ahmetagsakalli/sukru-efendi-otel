@@ -1,6 +1,27 @@
 import { z } from "zod";
 
-export const dateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Tarih formatı geçersiz.");
+function isValidDateOnly(value: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return false;
+  }
+
+  const [year, month, day] = value.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
+}
+
+function dateIsAfter(checkOut: string, checkIn: string) {
+  if (!isValidDateOnly(checkIn) || !isValidDateOnly(checkOut)) {
+    return false;
+  }
+
+  return new Date(`${checkOut}T00:00:00Z`).getTime() > new Date(`${checkIn}T00:00:00Z`).getTime();
+}
+
+export const dateSchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, "Tarih formatı geçersiz.")
+  .refine(isValidDateOnly, "Tarih geçersiz.");
 const emailValueSchema = z
   .string()
   .trim()
@@ -31,7 +52,7 @@ export const createReservationRequestSchema = z
     note: optionalTextSchema(700, "Not çok uzun."),
     website: optionalTextSchema(200, "Web sitesi alanı geçersiz.")
   })
-  .refine((value) => new Date(value.checkOut).getTime() > new Date(value.checkIn).getTime(), {
+  .refine((value) => dateIsAfter(value.checkOut, value.checkIn), {
     message: dateOrderMessage,
     path: ["checkOut"]
   });
@@ -42,7 +63,7 @@ export const availabilityQuerySchema = z
     checkOut: dateSchema,
     roomSlug: z.string().trim().min(2).max(90).optional()
   })
-  .refine((value) => new Date(value.checkOut).getTime() > new Date(value.checkIn).getTime(), {
+  .refine((value) => dateIsAfter(value.checkOut, value.checkIn), {
     message: dateOrderMessage,
     path: ["checkOut"]
   });
@@ -66,7 +87,7 @@ export const adminCreateReservationSchema = z
     adminNote: storedTextSchema(700, "Admin notu çok uzun."),
     status: reservationStatusSchema.default("confirmed")
   })
-  .refine((value) => new Date(value.checkOut).getTime() > new Date(value.checkIn).getTime(), {
+  .refine((value) => dateIsAfter(value.checkOut, value.checkIn), {
     message: dateOrderMessage,
     path: ["checkOut"]
   });
@@ -114,7 +135,7 @@ export const updateReservationRequestSchema = z
     note: storedTextSchema(700, "Not çok uzun."),
     adminNote: storedTextSchema(700, "Admin notu çok uzun.")
   })
-  .refine((value) => new Date(value.checkOut).getTime() > new Date(value.checkIn).getTime(), {
+  .refine((value) => dateIsAfter(value.checkOut, value.checkIn), {
     message: dateOrderMessage,
     path: ["checkOut"]
   });

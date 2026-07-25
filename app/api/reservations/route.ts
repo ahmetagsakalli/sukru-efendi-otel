@@ -3,7 +3,7 @@ import { ZodError } from "zod";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { formatBookingCurrency, todayDateOnly } from "@/lib/booking";
 import { createReservationRequestSchema } from "@/lib/reservation-schema";
-import { createReservationRequest, ReservationConflictError } from "@/lib/reservations";
+import { createReservationRequest, ReservationConflictError, ReservationOccupancyError } from "@/lib/reservations";
 import { getSiteContent } from "@/lib/site-content";
 
 export const runtime = "nodejs";
@@ -94,6 +94,10 @@ export async function POST(request: NextRequest) {
 
     if (error instanceof ReservationConflictError) {
       return NextResponse.json({ error: error.message }, { status: 409 });
+    }
+
+    if (error instanceof ReservationOccupancyError) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
     console.error("reservation_request_failed", error);

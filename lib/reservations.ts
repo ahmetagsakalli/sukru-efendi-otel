@@ -2,8 +2,9 @@ import { unstable_noStore as noStore } from "next/cache";
 import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { getRoomAvailability, getStayPricing } from "@/lib/booking";
+import { getRoomAvailability, getStayPricing, validateRoomOccupancy } from "@/lib/booking";
 import type { Room } from "@/lib/site-content-schema";
+import { isBlobStorageEnabled, readBlobText, writeBlobText } from "@/lib/storage";
 import {
   AdminCreateReservationInput,
   adminCreateReservationSchema,
@@ -22,6 +23,10 @@ const reservationFilePath = process.env.RESERVATION_REQUESTS_FILE
   : path.join(contentDirectory, "reservation-requests.json");
 
 const reservationBackupDirectory = path.join(contentDirectory, "reservation-backups");
+const reservationBlobPath = process.env.RESERVATION_REQUESTS_BLOB_PATH ?? "content/reservation-requests.json";
+const reservationBackupBlobDirectory =
+  process.env.RESERVATION_BACKUP_BLOB_DIR ?? "content/reservation-backups";
+let reservationMutationQueue: Promise<void> = Promise.resolve();
 
 export class ReservationConflictError extends Error {
   constructor(message = "Seçilen tarih aralığında bu oda için müsaitlik yok.") {
@@ -37,8 +42,31 @@ export class ReservationRoomNotFoundError extends Error {
   }
 }
 
+export class ReservationOccupancyError extends Error {
+  constructor(message = "Misafir sayısı oda kapasitesini aşıyor.") {
+    super(message);
+    this.name = "ReservationOccupancyError";
+  }
+}
+
 function timestamp() {
   return new Date().toISOString().replace(/[:.]/g, "-");
+}
+
+async function withReservationMutation<T>(operation: () => Promise<T>) {
+  const previousMutation = reservationMutationQueue.catch(() => undefined);
+  let releaseQueue: () => void = () => undefined;
+  reservationMutationQueue = new Promise<void>((resolve) => {
+    releaseQueue = resolve;
+  });
+
+  await previousMutation;
+
+  try {
+    return await operation();
+  } finally {
+    releaseQueue();
+  }
 }
 
 async function ensureReservationDirectory() {
@@ -47,6 +75,14 @@ async function ensureReservationDirectory() {
 }
 
 async function readReservationFile(): Promise<ReservationRequest[]> {
+  if (isBlobStorageEnabled()) {
+    const blobJson = await readBlobText(reservationBlobPath);
+
+    if (blobJson) {
+      return reservationRequestSchema.array().parse(JSON.parse(blobJson));
+    }
+  }
+
   try {
     const raw = await fs.readFile(reservationFilePath, "utf8");
     return reservationRequestSchema.array().parse(JSON.parse(raw));
@@ -60,9 +96,19 @@ async function readReservationFile(): Promise<ReservationRequest[]> {
 }
 
 async function writeReservationFile(items: ReservationRequest[]) {
+  const previous = await readReservationFile();
+
+  if (isBlobStorageEnabled()) {
+    await writeBlobText(
+      `${reservationBackupBlobDirectory}/reservation-requests-${timestamp()}.json`,
+      `${JSON.stringify(previous, null, 2)}\n`
+    );
+    await writeBlobText(reservationBlobPath, `${JSON.stringify(items, null, 2)}\n`);
+    return;
+  }
+
   await ensureReservationDirectory();
 
-  const previous = await readReservationFile();
   await fs.writeFile(
     path.join(reservationBackupDirectory, `reservation-requests-${timestamp()}.json`),
     `${JSON.stringify(previous, null, 2)}\n`,
@@ -108,6 +154,14 @@ function ensureCanBlockRoom({
   }
 }
 
+function ensureRoomOccupancy(room: Room, adults: number, children: number) {
+  const occupancy = validateRoomOccupancy(room, adults, children);
+
+  if (!occupancy.isValid) {
+    throw new ReservationOccupancyError(occupancy.message);
+  }
+}
+
 function buildReservationRecord({
   id,
   createdAt,
@@ -125,6 +179,7 @@ function buildReservationRecord({
   status: ReservationRequest["status"];
   updatedAt: string;
 }) {
+  ensureRoomOccupancy(room, input.adults, input.children);
   const pricing = getStayPricing(room, input.checkIn, input.checkOut);
 
   return reservationRequestSchema.parse({
@@ -149,101 +204,107 @@ function buildReservationRecord({
 }
 
 export async function createReservationRequest(input: CreateReservationRequestInput, room: Room) {
-  const now = new Date().toISOString();
+  return withReservationMutation(async () => {
+    const now = new Date().toISOString();
 
-  const items = await readReservationFile();
-  ensureCanBlockRoom({
-    checkIn: input.checkIn,
-    checkOut: input.checkOut,
-    items,
-    room
+    const items = await readReservationFile();
+    ensureCanBlockRoom({
+      checkIn: input.checkIn,
+      checkOut: input.checkOut,
+      items,
+      room
+    });
+
+    const item = buildReservationRecord({
+      id: crypto.randomUUID(),
+      createdAt: now,
+      input,
+      room,
+      source: "website",
+      status: "new",
+      updatedAt: now
+    });
+
+    await writeReservationFile([item, ...items]);
+    return item;
   });
-
-  const item = buildReservationRecord({
-    id: crypto.randomUUID(),
-    createdAt: now,
-    input,
-    room,
-    source: "website",
-    status: "new",
-    updatedAt: now
-  });
-
-  await writeReservationFile([item, ...items]);
-  return item;
 }
 
 export async function createAdminReservation(rawInput: unknown, rooms: Room[]) {
-  const input = adminCreateReservationSchema.parse(rawInput);
-  const room = findRoom(rooms, input.roomSlug);
+  return withReservationMutation(async () => {
+    const input = adminCreateReservationSchema.parse(rawInput);
+    const room = findRoom(rooms, input.roomSlug);
 
-  if (!room) {
-    throw new ReservationRoomNotFoundError();
-  }
+    if (!room) {
+      throw new ReservationRoomNotFoundError();
+    }
 
-  const items = await readReservationFile();
+    const items = await readReservationFile();
 
-  if (input.status === "confirmed") {
-    ensureCanBlockRoom({
-      checkIn: input.checkIn,
-      checkOut: input.checkOut,
-      items,
-      room
+    if (input.status === "confirmed") {
+      ensureCanBlockRoom({
+        checkIn: input.checkIn,
+        checkOut: input.checkOut,
+        items,
+        room
+      });
+    }
+
+    const now = new Date().toISOString();
+    const item = buildReservationRecord({
+      id: crypto.randomUUID(),
+      createdAt: now,
+      input,
+      room,
+      source: "admin",
+      status: input.status,
+      updatedAt: now
     });
-  }
 
-  const now = new Date().toISOString();
-  const item = buildReservationRecord({
-    id: crypto.randomUUID(),
-    createdAt: now,
-    input,
-    room,
-    source: "admin",
-    status: input.status,
-    updatedAt: now
+    await writeReservationFile([item, ...items]);
+    return item;
   });
-
-  await writeReservationFile([item, ...items]);
-  return item;
 }
 
 export async function updateReservationRequest(rawInput: unknown, rooms: Room[]) {
-  const input = updateReservationRequestSchema.parse(rawInput);
-  const now = new Date().toISOString();
-  const items = await readReservationFile();
-  const index = items.findIndex((item) => item.id === input.id);
+  return withReservationMutation(async () => {
+    const input = updateReservationRequestSchema.parse(rawInput);
+    const now = new Date().toISOString();
+    const items = await readReservationFile();
+    const index = items.findIndex((item) => item.id === input.id);
 
-  if (index === -1) {
-    return null;
-  }
+    if (index === -1) {
+      return null;
+    }
 
-  const room = findRoom(rooms, input.roomSlug);
+    const room = findRoom(rooms, input.roomSlug);
 
-  if (!room) {
-    throw new ReservationRoomNotFoundError();
-  }
+    if (!room) {
+      throw new ReservationRoomNotFoundError();
+    }
 
-  if (input.status === "confirmed") {
-    ensureCanBlockRoom({
-      checkIn: input.checkIn,
-      checkOut: input.checkOut,
-      excludeReservationId: input.id,
-      items,
-      room
+    if (input.status === "confirmed") {
+      ensureCanBlockRoom({
+        checkIn: input.checkIn,
+        checkOut: input.checkOut,
+        excludeReservationId: input.id,
+        items,
+        room
+      });
+    }
+
+    const updated = buildReservationRecord({
+      id: items[index].id,
+      createdAt: items[index].createdAt,
+      input,
+      room,
+      source: items[index].source,
+      status: input.status,
+      updatedAt: now
     });
-  }
 
-  const updated = buildReservationRecord({
-    id: items[index].id,
-    createdAt: items[index].createdAt,
-    input,
-    room,
-    source: items[index].source,
-    status: input.status,
-    updatedAt: now
+    const next = items.map((item, currentIndex) => (currentIndex === index ? updated : item));
+    await writeReservationFile(next);
+    return updated;
   });
-
-  const next = items.map((item, currentIndex) => (currentIndex === index ? updated : item));
-  await writeReservationFile(next);
-  return updated;
 }

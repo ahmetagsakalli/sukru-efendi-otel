@@ -36,8 +36,10 @@ function applySecurityHeaders(response: NextResponse) {
 }
 
 export function middleware(request: NextRequest) {
+  const isAdminRoute = request.nextUrl.pathname.startsWith("/admin") || request.nextUrl.pathname.startsWith("/dashboard");
+
   if (
-    request.nextUrl.pathname.startsWith("/admin") &&
+    isAdminRoute &&
     request.nextUrl.pathname !== "/admin/login" &&
     !request.cookies.has("sukru_admin_session")
   ) {

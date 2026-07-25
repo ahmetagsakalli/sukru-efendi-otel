@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { NextResponse } from "next/server";
 import { getPublicDirectory } from "@/lib/site-content";
+import { readPublicBlob } from "@/lib/storage";
 
 export const runtime = "nodejs";
 
@@ -35,7 +36,19 @@ export async function GET(_request: Request, { params }: { params: { path: strin
     });
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-      return NextResponse.json({ error: "Görsel bulunamadı." }, { status: 404 });
+      const blob = await readPublicBlob(`uploads/${segments.join("/")}`);
+
+      if (!blob) {
+        return NextResponse.json({ error: "Görsel bulunamadı." }, { status: 404 });
+      }
+
+      return new NextResponse(new Uint8Array(blob.body), {
+        headers: {
+          "Cache-Control": "public, max-age=31536000, immutable",
+          "Content-Length": String(blob.size),
+          "Content-Type": blob.contentType || "image/webp"
+        }
+      });
     }
 
     console.error("uploaded_image_read_failed", error);

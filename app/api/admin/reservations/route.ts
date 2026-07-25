@@ -5,6 +5,7 @@ import {
   createAdminReservation,
   listReservationRequests,
   ReservationConflictError,
+  ReservationOccupancyError,
   ReservationRoomNotFoundError,
   updateReservationRequest
 } from "@/lib/reservations";
@@ -44,6 +45,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
+    if (error instanceof ReservationOccupancyError) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+
     if (error instanceof ZodError) {
       return NextResponse.json({ error: error.issues[0]?.message ?? "Geçersiz rezervasyon bilgisi." }, { status: 400 });
     }
@@ -72,6 +77,10 @@ export async function PATCH(request: Request) {
     }
 
     if (error instanceof ReservationRoomNotFoundError) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+
+    if (error instanceof ReservationOccupancyError) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
 

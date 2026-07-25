@@ -67,6 +67,34 @@ export function formatBookingCurrency(amount: number, currency = BOOKING_CURRENC
   }).format(amount);
 }
 
+export function getRoomCapacityLimit(room: Pick<Room, "capacity">) {
+  const numbers = room.capacity
+    .match(/\d+/g)
+    ?.map(Number)
+    .filter((value) => Number.isInteger(value) && value > 0);
+
+  return numbers?.length ? Math.max(...numbers) : 1;
+}
+
+export function getGuestCount(adults: number, children: number) {
+  return Math.max(0, adults) + Math.max(0, children);
+}
+
+export function validateRoomOccupancy(room: Pick<Room, "capacity" | "title">, adults: number, children: number) {
+  const capacityLimit = getRoomCapacityLimit(room);
+  const guestCount = getGuestCount(adults, children);
+
+  return {
+    capacityLimit,
+    guestCount,
+    isValid: guestCount > 0 && guestCount <= capacityLimit,
+    message:
+      guestCount > capacityLimit
+        ? `${room.title} için en fazla ${capacityLimit} misafir seçilebilir.`
+        : "En az 1 misafir seçilmeli."
+  };
+}
+
 export function rangesOverlap(firstCheckIn: string, firstCheckOut: string, secondCheckIn: string, secondCheckOut: string) {
   const firstStart = parseDateOnly(firstCheckIn);
   const firstEnd = parseDateOnly(firstCheckOut);
@@ -111,12 +139,14 @@ export function getRoomAvailability(
     return rangesOverlap(checkIn, checkOut, reservation.checkIn, reservation.checkOut);
   }).length;
   const availableRooms = Math.max(room.count - bookedRooms, 0);
+  const capacityLimit = getRoomCapacityLimit(room);
   const pricing = getStayPricing(room, checkIn, checkOut);
 
   return {
     ...pricing,
     availableRooms,
     bookedRooms,
+    capacityLimit,
     isAvailable: pricing.nights > 0 && room.count > 0 && availableRooms > 0,
     roomSlug: room.slug,
     roomTitle: room.title,

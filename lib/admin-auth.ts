@@ -3,6 +3,7 @@ import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { cookies } from "next/headers";
+import { isBlobStorageEnabled, readBlobText, writeBlobText } from "@/lib/storage";
 
 const SESSION_COOKIE = "sukru_admin_session";
 const SESSION_TTL_SECONDS = 8 * 60 * 60;
@@ -24,8 +25,28 @@ const contentDirectory = process.env.SITE_CONTENT_DIR
   : path.join(process.cwd(), "content");
 
 const authFilePath = path.join(contentDirectory, ".admin-auth.json");
+const authBlobPath = process.env.ADMIN_AUTH_BLOB_PATH ?? "content/.admin-auth.json";
 
 async function readLocalAuth(): Promise<LocalAuthFile | null> {
+  if (isBlobStorageEnabled()) {
+    const blobJson = await readBlobText(authBlobPath);
+
+    if (blobJson) {
+      const parsed = JSON.parse(blobJson) as Partial<LocalAuthFile>;
+
+      if (!parsed.passwordHash || !parsed.sessionSecret || !parsed.createdAt) {
+        return null;
+      }
+
+      return {
+        passwordHash: parsed.passwordHash,
+        sessionSecret: parsed.sessionSecret,
+        createdAt: parsed.createdAt,
+        updatedAt: parsed.updatedAt
+      };
+    }
+  }
+
   try {
     const raw = await fs.readFile(authFilePath, "utf8");
     const parsed = JSON.parse(raw) as Partial<LocalAuthFile>;
@@ -107,6 +128,11 @@ export function validateAdminPassword(password: string) {
 }
 
 async function writeLocalAuthFile(authFile: LocalAuthFile) {
+  if (isBlobStorageEnabled()) {
+    await writeBlobText(authBlobPath, `${JSON.stringify(authFile, null, 2)}\n`);
+    return;
+  }
+
   await fs.mkdir(contentDirectory, { recursive: true });
 
   const temporaryPath = `${authFilePath}.tmp-${process.pid}-${Date.now()}`;
@@ -141,6 +167,11 @@ export async function createLocalAdminAuth(password: string) {
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
   };
+
+  if (isBlobStorageEnabled()) {
+    await writeLocalAuthFile(authFile);
+    return { ok: true as const, sessionSecret: authFile.sessionSecret };
+  }
 
   await fs.mkdir(contentDirectory, { recursive: true });
   await fs.writeFile(authFilePath, `${JSON.stringify(authFile, null, 2)}\n`, {

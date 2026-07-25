@@ -11,6 +11,7 @@ import {
   site as defaultSite
 } from "@/data/site";
 import { AdminImage, SiteContent, siteContentSchema } from "@/lib/site-content-schema";
+import { isBlobStorageEnabled, listBlobImages, readBlobText, writeBlobText } from "@/lib/storage";
 
 const contentDirectory = process.env.SITE_CONTENT_DIR
   ? path.resolve(process.env.SITE_CONTENT_DIR)
@@ -21,6 +22,8 @@ const contentFilePath = process.env.SITE_CONTENT_FILE
   : path.join(contentDirectory, "site-content.json");
 
 const backupDirectory = path.join(contentDirectory, "backups");
+const contentBlobPath = process.env.SITE_CONTENT_BLOB_PATH ?? "content/site-content.json";
+const backupBlobDirectory = process.env.SITE_CONTENT_BACKUP_BLOB_DIR ?? "content/backups";
 
 function resolvePublicDirectory() {
   if (process.env.SITE_PUBLIC_DIR) {
@@ -99,6 +102,14 @@ async function ensureContentDirectories() {
 }
 
 async function readContentFile(): Promise<SiteContent | null> {
+  if (isBlobStorageEnabled()) {
+    const blobJson = await readBlobText(contentBlobPath);
+
+    if (blobJson) {
+      return siteContentSchema.parse(JSON.parse(blobJson));
+    }
+  }
+
   try {
     const json = await fs.readFile(contentFilePath, "utf8");
     return siteContentSchema.parse(JSON.parse(json));
@@ -127,9 +138,19 @@ export async function saveSiteContent(rawContent: unknown): Promise<SiteContent>
     updatedAt: new Date().toISOString()
   });
 
+  const previous = (await readContentFile()) ?? defaultSiteContent;
+
+  if (isBlobStorageEnabled()) {
+    await writeBlobText(
+      `${backupBlobDirectory}/site-content-${timestamp()}.json`,
+      `${JSON.stringify(previous, null, 2)}\n`
+    );
+    await writeBlobText(contentBlobPath, `${JSON.stringify(parsed, null, 2)}\n`);
+    return parsed;
+  }
+
   await ensureContentDirectories();
 
-  const previous = (await readContentFile()) ?? defaultSiteContent;
   await fs.writeFile(
     path.join(backupDirectory, `site-content-${timestamp()}.json`),
     `${JSON.stringify(previous, null, 2)}\n`,
@@ -186,5 +207,12 @@ async function walkImages(directory: string, basePublicPath = ""): Promise<Admin
 
 export async function listPublicImages(): Promise<AdminImage[]> {
   noStore();
-  return walkImages(getPublicDirectory());
+  const [localImages, blobImages] = await Promise.all([walkImages(getPublicDirectory()), listBlobImages()]);
+  const bySource = new Map<string, AdminImage>();
+
+  [...localImages, ...blobImages].forEach((image) => {
+    bySource.set(image.src, image);
+  });
+
+  return [...bySource.values()].sort((a, b) => a.src.localeCompare(b.src));
 }

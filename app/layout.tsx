@@ -100,7 +100,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   const pathname = headers().get("x-pathname") ?? "";
-  const isAdminRoute = pathname.startsWith("/admin");
+  const isAdminRoute = pathname.startsWith("/admin") || pathname.startsWith("/dashboard");
 
   return (
     <html lang="tr">

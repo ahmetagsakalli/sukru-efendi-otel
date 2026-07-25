@@ -1,0 +1,34 @@
+import type { Metadata } from "next";
+import { redirect } from "next/navigation";
+import { AdminDashboard } from "@/components/admin/AdminDashboard";
+import { hasAdminSession } from "@/lib/admin-auth";
+import { listReservationRequests } from "@/lib/reservations";
+import { getSiteContent, listPublicImages } from "@/lib/site-content";
+
+export const metadata: Metadata = {
+  title: "Dashboard",
+  robots: {
+    index: false,
+    follow: false
+  }
+};
+
+export default async function DashboardPage() {
+  if (!(await hasAdminSession())) {
+    redirect("/admin/login");
+  }
+
+  const [content, images, reservations] = await Promise.all([
+    getSiteContent(),
+    listPublicImages(),
+    listReservationRequests()
+  ]);
+
+  return (
+    <AdminDashboard
+      initialContent={content}
+      initialImages={images}
+      initialReservations={reservations}
+    />
+  );
+}
