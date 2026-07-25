@@ -104,6 +104,7 @@ export default async function RoomDetailPage({ params }: RoomPageProps) {
 
       <section className="section room-detail-panel">
         <div className="room-detail-panel__text">
+          <span className="room-detail-panel__eyebrow">Oda deneyimi</span>
           <p>{room.longDescription}</p>
         </div>
       </section>

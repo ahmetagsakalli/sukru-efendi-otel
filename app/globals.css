@@ -2005,26 +2005,68 @@ body.lightbox-open {
 
 .room-detail-panel {
   display: block;
-  padding-bottom: 34px;
-  padding-top: 58px;
+  padding-bottom: 18px;
+  padding-top: 34px;
 }
 
 .room-detail-panel__text {
-  background: rgba(255, 254, 249, 0.78);
-  border: 1px solid var(--gold-soft);
-  border-left: 4px solid var(--gold);
+  align-items: start;
+  background:
+    linear-gradient(135deg, rgba(255, 254, 249, 0.92), rgba(255, 254, 249, 0.74)),
+    var(--card);
+  border: 1px solid rgba(201, 160, 96, 0.22);
   border-radius: 8px;
+  box-shadow: 0 18px 46px rgba(15, 20, 25, 0.07);
+  display: grid;
+  gap: 26px;
+  grid-template-columns: 170px minmax(0, 1fr);
   margin: 0 auto;
-  max-width: 1120px;
-  padding: clamp(28px, 4vw, 52px);
+  max-width: 960px;
+  overflow: hidden;
+  padding: 24px 30px;
+  position: relative;
+}
+
+.room-detail-panel__text:before {
+  background: var(--gold);
+  content: "";
+  height: 100%;
+  left: 0;
+  opacity: 0.9;
+  position: absolute;
+  top: 0;
+  width: 3px;
+}
+
+.room-detail-panel__eyebrow {
+  color: var(--gold);
+  font-family: var(--font-accent), Arial, Helvetica, sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  line-height: 1.5;
+  margin-top: 3px;
+  text-transform: uppercase;
 }
 
 .room-detail-panel__text p {
-  color: #5f6674;
-  font-size: clamp(20px, 2vw, 30px);
-  line-height: 1.62;
+  color: #586071;
+  font-size: clamp(16px, 1.12vw, 19px);
+  line-height: 1.72;
   margin: 0;
-  max-width: 940px;
+  max-width: none;
+}
+
+.detail-feature-section {
+  padding-top: 38px;
+}
+
+.detail-feature-section .section-title {
+  margin-bottom: 34px;
+}
+
+.detail-feature-section .section-title h2 {
+  font-size: clamp(34px, 4.1vw, 58px);
 }
 
 @media (max-width: 760px) {
@@ -2045,10 +2087,28 @@ body.lightbox-open {
   }
 
   .room-detail-panel {
-    padding-top: 34px;
+    padding-top: 26px;
   }
 
   .room-detail-panel__text {
-    padding: 24px;
+    gap: 10px;
+    grid-template-columns: 1fr;
+    padding: 20px 22px;
+  }
+
+  .room-detail-panel__eyebrow {
+    margin-top: 0;
+  }
+
+  .detail-feature-section {
+    padding-top: 24px;
+  }
+
+  .detail-feature-section .section-title {
+    margin-bottom: 24px;
+  }
+
+  .detail-feature-section .section-title h2 {
+    font-size: 31px;
   }
 }
