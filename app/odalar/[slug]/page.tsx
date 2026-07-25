@@ -46,6 +46,11 @@ export default async function RoomDetailPage({ params }: RoomPageProps) {
   }
 
   const otherRooms = rooms.filter((item) => item.slug !== room.slug);
+  const roomMetrics = [
+    { label: "Alan", value: room.size },
+    { label: "Kapasite", value: room.capacity },
+    { label: "Yatak", value: room.bed }
+  ];
 
   return (
     <div className="page-transition">
@@ -64,10 +69,13 @@ export default async function RoomDetailPage({ params }: RoomPageProps) {
           <p className="room-detail-kicker">{site.name}</p>
           <h1>{room.title}</h1>
           <p>{room.description}</p>
-          <div className="room-detail-metrics">
-            <span>{room.size}</span>
-            <span>{room.capacity}</span>
-            <span>{room.bed}</span>
+          <div className="room-detail-metrics" aria-label={`${room.title} oda bilgileri`}>
+            {roomMetrics.map((metric) => (
+              <div key={metric.label}>
+                <span>{metric.label}</span>
+                <strong>{metric.value}</strong>
+              </div>
+            ))}
           </div>
           <div className="room-detail-actions">
             <Link className="booking-link booking-link--glass" href="/#rezervasyon">
