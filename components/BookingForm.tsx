@@ -209,7 +209,12 @@ export function BookingForm({ rooms }: { rooms: Room[] }) {
         reservation?: {
           id?: string;
           nights?: number;
+          paymentStatus?: string;
           totalLabel?: string;
+        };
+        payment?: {
+          required?: boolean;
+          status?: string;
         };
       };
 
@@ -217,6 +222,35 @@ export function BookingForm({ rooms }: { rooms: Room[] }) {
         const issue = result.issues?.[0];
         setMessageType("error");
         setMessage(issue ? issue.message : result.error ?? "Talep gönderilemedi.");
+        return;
+      }
+
+      if (result.payment?.required && result.reservation?.id) {
+        setMessageType("success");
+        setMessage("Rezervasyon talebiniz alındı. Güvenli ödeme ekranına yönlendiriliyorsunuz.");
+
+        const paymentResponse = await fetch("/api/payments/create", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ reservationId: result.reservation.id })
+        });
+        const paymentResult = (await paymentResponse.json().catch(() => ({}))) as {
+          error?: string;
+          payment?: {
+            redirectUrl?: string;
+          };
+        };
+
+        if (!paymentResponse.ok || !paymentResult.payment?.redirectUrl) {
+          setMessageType("error");
+          setMessage(
+            paymentResult.error ??
+              "Rezervasyon talebiniz alındı ancak ödeme başlatılamadı. Otel kısa süre içinde sizinle iletişime geçecek."
+          );
+          return;
+        }
+
+        window.location.assign(paymentResult.payment.redirectUrl);
         return;
       }
 

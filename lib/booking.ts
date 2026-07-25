@@ -4,6 +4,26 @@ import type { Room } from "@/lib/site-content-schema";
 export const BOOKING_CURRENCY = "TRY";
 
 const blockingStatuses = new Set<ReservationStatus>(["confirmed"]);
+const DEFAULT_PAYMENT_HOLD_MINUTES = 30;
+
+function getPaymentHoldMinutes() {
+  const value = Number(process.env.PAYMENT_HOLD_MINUTES);
+  return Number.isFinite(value) ? Math.max(5, Math.min(180, Math.round(value))) : DEFAULT_PAYMENT_HOLD_MINUTES;
+}
+
+function isPaymentHoldActive(reservation: Pick<ReservationRequest, "paymentStartedAt" | "paymentStatus">) {
+  if (reservation.paymentStatus !== "processing") {
+    return false;
+  }
+
+  const startedAt = new Date(reservation.paymentStartedAt).getTime();
+
+  if (!Number.isFinite(startedAt)) {
+    return false;
+  }
+
+  return Date.now() - startedAt <= getPaymentHoldMinutes() * 60 * 1000;
+}
 
 function dateOnly(date: Date) {
   const year = date.getFullYear();
@@ -108,8 +128,16 @@ export function rangesOverlap(firstCheckIn: string, firstCheckOut: string, secon
   return firstStart.getTime() < secondEnd.getTime() && secondStart.getTime() < firstEnd.getTime();
 }
 
-export function isReservationBlocking(status: ReservationStatus) {
-  return blockingStatuses.has(status);
+export function isReservationBlocking(statusOrReservation: ReservationStatus | ReservationRequest) {
+  if (typeof statusOrReservation === "string") {
+    return blockingStatuses.has(statusOrReservation);
+  }
+
+  return (
+    blockingStatuses.has(statusOrReservation.status) ||
+    statusOrReservation.paymentStatus === "paid" ||
+    isPaymentHoldActive(statusOrReservation)
+  );
 }
 
 export function getStayPricing(room: Room, checkIn: string, checkOut: string) {
@@ -135,7 +163,7 @@ export function getRoomAvailability(
   const bookedRooms = reservations.filter((reservation) => {
     if (reservation.id === excludeReservationId) return false;
     if (reservation.roomSlug !== room.slug) return false;
-    if (!isReservationBlocking(reservation.status)) return false;
+    if (!isReservationBlocking(reservation)) return false;
     return rangesOverlap(checkIn, checkOut, reservation.checkIn, reservation.checkOut);
   }).length;
   const availableRooms = Math.max(room.count - bookedRooms, 0);

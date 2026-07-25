@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { ZodError } from "zod";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { formatBookingCurrency, todayDateOnly } from "@/lib/booking";
+import { isPaymentCollectionEnabled } from "@/lib/payments";
 import { createReservationRequestSchema } from "@/lib/reservation-schema";
 import { createReservationRequest, ReservationConflictError, ReservationOccupancyError } from "@/lib/reservations";
 import { getSiteContent } from "@/lib/site-content";
@@ -77,8 +78,13 @@ export async function POST(request: NextRequest) {
         id: requestItem.id,
         estimatedTotal: requestItem.estimatedTotal,
         nights: requestItem.nights,
+        paymentStatus: requestItem.paymentStatus,
         status: requestItem.status,
         totalLabel: formatBookingCurrency(requestItem.estimatedTotal, requestItem.currency)
+      },
+      payment: {
+        required: isPaymentCollectionEnabled(),
+        status: requestItem.paymentStatus
       }
     });
   } catch (error) {

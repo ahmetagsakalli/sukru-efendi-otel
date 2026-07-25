@@ -31,7 +31,7 @@ import {
   Users
 } from "lucide-react";
 import { formatBookingCurrency, getGuestCount, getRoomAvailability, getRoomCapacityLimit } from "@/lib/booking";
-import type { ReservationRequest, ReservationStatus } from "@/lib/reservation-schema";
+import type { PaymentStatus, ReservationRequest, ReservationStatus } from "@/lib/reservation-schema";
 import type { AdminImage, GalleryItem, Room, RoomFeature, SiteContent } from "@/lib/site-content-schema";
 
 type AdminDashboardProps = {
@@ -211,6 +211,24 @@ const reservationStatusLabels: Record<ReservationStatus, string> = {
   cancelled: "İptal",
   archived: "Arşiv"
 };
+
+const paymentStatusLabels: Record<PaymentStatus, string> = {
+  not_required: "Ödeme yok",
+  pending: "Ödeme bekliyor",
+  processing: "Ödeme ekranında",
+  paid: "Ödendi",
+  failed: "Başarısız",
+  cancelled: "İptal",
+  refunded: "İade"
+};
+
+function getPaymentTone(status: PaymentStatus) {
+  if (status === "paid") return "success";
+  if (status === "failed" || status === "cancelled") return "danger";
+  if (status === "processing" || status === "pending") return "warning";
+  if (status === "refunded") return "info";
+  return "muted";
+}
 
 const MAX_CLIENT_UPLOAD_SIZE = 10 * 1024 * 1024;
 const acceptedUploadTypes = new Set(["image/jpeg", "image/png", "image/webp", "image/avif"]);
@@ -995,6 +1013,7 @@ export function AdminDashboard({ initialContent, initialImages, initialReservati
                     </span>
                     <span>
                       <StatusBadge status={reservation.status} />
+                      <PaymentBadge status={reservation.paymentStatus} />
                     </span>
                     <span>{formatBookingCurrency(reservation.estimatedTotal, reservation.currency)}</span>
                   </div>
@@ -1326,12 +1345,23 @@ export function AdminDashboard({ initialContent, initialImages, initialReservati
                   </span>
                   <span>{reservation.nights} gece</span>
                   <span>{formatBookingCurrency(reservation.estimatedTotal, reservation.currency)}</span>
+                  <span>
+                    <PaymentBadge status={reservation.paymentStatus} />
+                  </span>
                   <span>{reservation.source === "admin" ? "Admin" : "Web"}</span>
                   <span>
                     {reservation.adults} yetişkin
                     {reservation.children > 0 ? `, ${reservation.children} çocuk` : ""}
                   </span>
                 </div>
+                {reservation.paymentStatus !== "not_required" ? (
+                  <div className="admin-payment-summary">
+                    <span>{reservation.paymentProvider.toUpperCase()}</span>
+                    <strong>{formatBookingCurrency(reservation.paymentAmount || reservation.estimatedTotal, reservation.paymentCurrency)}</strong>
+                    {reservation.paymentReference ? <code>{reservation.paymentReference}</code> : null}
+                    {reservation.paymentFailureReason ? <em>{reservation.paymentFailureReason}</em> : null}
+                  </div>
+                ) : null}
                 {reservation.note ? <p className="admin-reservation-note">{reservation.note}</p> : null}
                 <ReservationAvailabilityPreview compact preview={reservationPreview} />
                 <div className="admin-reservation-actions">
@@ -1539,6 +1569,7 @@ export function AdminDashboard({ initialContent, initialImages, initialReservati
                   <span>{reservation.nights} gece</span>
                   <span>{reservation.adults + reservation.children} misafir</span>
                   <span>{formatBookingCurrency(reservation.estimatedTotal, reservation.currency)}</span>
+                  <span>{paymentStatusLabels[reservation.paymentStatus]}</span>
                   <span>{formatDateTimeLabel(reservation.createdAt)}</span>
                 </div>
                 <div className="admin-inline-actions">
@@ -2359,6 +2390,14 @@ function StatusBadge({ status }: { status: ReservationStatus }) {
   return (
     <span className={`admin-status-badge admin-status-badge--${getStatusTone(status)}`}>
       {reservationStatusLabels[status]}
+    </span>
+  );
+}
+
+function PaymentBadge({ status }: { status: PaymentStatus }) {
+  return (
+    <span className={`admin-status-badge admin-status-badge--${getPaymentTone(status)}`}>
+      {paymentStatusLabels[status]}
     </span>
   );
 }

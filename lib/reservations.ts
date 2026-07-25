@@ -3,6 +3,7 @@ import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { getRoomAvailability, getStayPricing, validateRoomOccupancy } from "@/lib/booking";
+import { getInitialPaymentFields } from "@/lib/payments";
 import type { Room } from "@/lib/site-content-schema";
 import { isBlobStorageEnabled, readBlobText, writeBlobText } from "@/lib/storage";
 import {
@@ -13,6 +14,24 @@ import {
   reservationRequestSchema,
   updateReservationRequestSchema
 } from "@/lib/reservation-schema";
+
+type ReservationPaymentPatch = Partial<
+  Pick<
+    ReservationRequest,
+    | "adminNote"
+    | "paidAt"
+    | "paymentAmount"
+    | "paymentCurrency"
+    | "paymentFailureReason"
+    | "paymentProvider"
+    | "paymentRedirectUrl"
+    | "paymentReference"
+    | "paymentStartedAt"
+    | "paymentStatus"
+    | "paymentUpdatedAt"
+    | "status"
+  >
+>;
 
 const contentDirectory = process.env.SITE_CONTENT_DIR
   ? path.resolve(process.env.SITE_CONTENT_DIR)
@@ -166,6 +185,7 @@ function buildReservationRecord({
   id,
   createdAt,
   input,
+  payment,
   room,
   source,
   status,
@@ -174,6 +194,7 @@ function buildReservationRecord({
   id: string;
   createdAt: string;
   input: AdminCreateReservationInput | CreateReservationRequestInput;
+  payment?: ReservationPaymentPatch;
   room: Room;
   source: "admin" | "website";
   status: ReservationRequest["status"];
@@ -199,6 +220,7 @@ function buildReservationRecord({
     email: input.email ?? "",
     note: input.note ?? "",
     adminNote: "adminNote" in input ? input.adminNote ?? "" : "",
+    ...payment,
     ...pricing
   });
 }
@@ -219,6 +241,7 @@ export async function createReservationRequest(input: CreateReservationRequestIn
       id: crypto.randomUUID(),
       createdAt: now,
       input,
+      payment: getInitialPaymentFields(),
       room,
       source: "website",
       status: "new",
@@ -297,12 +320,134 @@ export async function updateReservationRequest(rawInput: unknown, rooms: Room[])
       id: items[index].id,
       createdAt: items[index].createdAt,
       input,
+      payment: {
+        paidAt: items[index].paidAt,
+        paymentAmount: items[index].paymentAmount,
+        paymentCurrency: items[index].paymentCurrency,
+        paymentFailureReason: items[index].paymentFailureReason,
+        paymentProvider: items[index].paymentProvider,
+        paymentRedirectUrl: items[index].paymentRedirectUrl,
+        paymentReference: items[index].paymentReference,
+        paymentStartedAt: items[index].paymentStartedAt,
+        paymentStatus: items[index].paymentStatus,
+        paymentUpdatedAt: items[index].paymentUpdatedAt
+      },
       room,
       source: items[index].source,
       status: input.status,
       updatedAt: now
     });
 
+    const next = items.map((item, currentIndex) => (currentIndex === index ? updated : item));
+    await writeReservationFile(next);
+    return updated;
+  });
+}
+
+export async function getReservationRequestById(id: string) {
+  noStore();
+  const items = await readReservationFile();
+  return items.find((item) => item.id === id) ?? null;
+}
+
+export async function updateReservationPaymentState(id: string, patch: ReservationPaymentPatch) {
+  return withReservationMutation(async () => {
+    const now = new Date().toISOString();
+    const items = await readReservationFile();
+    const index = items.findIndex((item) => item.id === id);
+
+    if (index === -1) {
+      return null;
+    }
+
+    const updated = reservationRequestSchema.parse({
+      ...items[index],
+      ...patch,
+      paymentUpdatedAt: now,
+      updatedAt: now
+    });
+    const next = items.map((item, currentIndex) => (currentIndex === index ? updated : item));
+    await writeReservationFile(next);
+    return updated;
+  });
+}
+
+function appendAdminNote(existingNote: string, note: string) {
+  return [existingNote, note].filter(Boolean).join("\n");
+}
+
+export async function settleReservationPaymentByReference({
+  amount,
+  failureReason,
+  isSuccessful,
+  provider,
+  reference,
+  rooms
+}: {
+  amount: number;
+  failureReason?: string;
+  isSuccessful: boolean;
+  provider: ReservationRequest["paymentProvider"];
+  reference: string;
+  rooms: Room[];
+}) {
+  return withReservationMutation(async () => {
+    const now = new Date().toISOString();
+    const items = await readReservationFile();
+    const index = items.findIndex((item) => item.paymentReference === reference);
+
+    if (index === -1) {
+      return null;
+    }
+
+    const current = items[index];
+
+    if (current.paymentStatus === "paid" && isSuccessful) {
+      return current;
+    }
+
+    let patch: ReservationPaymentPatch;
+
+    if (isSuccessful && amount >= current.paymentAmount) {
+      const room = rooms.find((item) => item.slug === current.roomSlug);
+      const availability = room
+        ? getRoomAvailability(room, items, current.checkIn, current.checkOut, current.id)
+        : null;
+      const canConfirm = Boolean(room && availability?.isAvailable);
+
+      patch = {
+        paidAt: current.paidAt || now,
+        paymentAmount: amount,
+        paymentCurrency: "TRY",
+        paymentFailureReason: "",
+        paymentProvider: provider,
+        paymentStatus: "paid",
+        paymentUpdatedAt: now,
+        status: canConfirm ? "confirmed" : "contacted"
+      };
+
+      if (!canConfirm) {
+        patch.adminNote = appendAdminNote(
+          current.adminNote,
+          "Ödeme alındı ancak müsaitlik otomatik onay için uygun değildi. Manuel kontrol ve gerekirse iade gerekiyor."
+        );
+      }
+    } else {
+      patch = {
+        paymentFailureReason:
+          failureReason || (isSuccessful ? "Ödeme tutarı beklenen tutardan düşük geldi." : "Ödeme başarısız."),
+        paymentProvider: provider,
+        paymentStatus: "failed",
+        paymentUpdatedAt: now,
+        status: current.status === "confirmed" ? "contacted" : "cancelled"
+      };
+    }
+
+    const updated = reservationRequestSchema.parse({
+      ...current,
+      ...patch,
+      updatedAt: now
+    });
     const next = items.map((item, currentIndex) => (currentIndex === index ? updated : item));
     await writeReservationFile(next);
     return updated;

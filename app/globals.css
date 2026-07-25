@@ -964,6 +964,7 @@ h3,
   font-size: 12px;
   font-weight: 850;
   line-height: 1;
+  margin-right: 6px;
   padding: 7px 10px;
   white-space: nowrap;
 }
@@ -1434,6 +1435,121 @@ h3,
   font-size: 14px;
   line-height: 1.55;
   margin: 0;
+}
+
+.admin-payment-summary {
+  align-items: center;
+  background: #f8fafc;
+  border: 1px solid var(--admin-line);
+  border-radius: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px 12px;
+}
+
+.admin-payment-summary span,
+.admin-payment-summary strong,
+.admin-payment-summary code,
+.admin-payment-summary em {
+  font-size: 12px;
+}
+
+.admin-payment-summary span {
+  color: var(--admin-muted);
+  font-weight: 850;
+  letter-spacing: 0.08em;
+}
+
+.admin-payment-summary strong {
+  color: var(--admin-ink);
+}
+
+.admin-payment-summary code {
+  background: var(--admin-panel);
+  border: 1px solid var(--admin-line);
+  border-radius: 999px;
+  color: var(--admin-muted);
+  padding: 5px 8px;
+}
+
+.admin-payment-summary em {
+  color: #b42318;
+  font-style: normal;
+  width: 100%;
+}
+
+.payment-page {
+  align-items: center;
+  background:
+    linear-gradient(180deg, rgba(15, 20, 25, 0.66), rgba(31, 67, 61, 0.72)),
+    url("/hotel-images/facade-night-wide.webp") center / cover;
+  display: grid;
+  min-height: 100svh;
+  padding: 138px 24px 72px;
+}
+
+.payment-page--iframe {
+  align-items: start;
+}
+
+.payment-panel {
+  background: rgba(255, 254, 249, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.42);
+  border-radius: 8px;
+  box-shadow: 0 28px 90px rgba(6, 15, 21, 0.32);
+  color: var(--ink);
+  display: grid;
+  gap: 18px;
+  margin: 0 auto;
+  max-width: 620px;
+  padding: clamp(28px, 5vw, 52px);
+  width: min(100%, 620px);
+}
+
+.payment-panel--wide {
+  max-width: 1040px;
+  width: min(100%, 1040px);
+}
+
+.payment-eyebrow {
+  color: var(--gold);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.payment-panel h1 {
+  color: var(--ink);
+  font-size: clamp(34px, 5vw, 58px);
+  margin: 0;
+}
+
+.payment-panel p {
+  color: var(--muted);
+  font-size: 16px;
+  line-height: 1.7;
+  margin: 0;
+}
+
+.payment-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.payment-actions form {
+  margin: 0;
+}
+
+.payment-iframe {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  height: min(760px, 72svh);
+  width: 100%;
 }
 
 .admin-reservation-actions {

@@ -33,6 +33,10 @@ const dateOrderMessage = "Çıkış tarihi giriş tarihinden sonra olmalı.";
 
 export const reservationSourceSchema = z.enum(["website", "admin"]);
 export const reservationStatusSchema = z.enum(["new", "contacted", "confirmed", "cancelled", "archived"]);
+export const paymentProviderSchema = z.enum(["manual", "mock", "paytr"]).default("manual");
+export const paymentStatusSchema = z
+  .enum(["not_required", "pending", "processing", "paid", "failed", "cancelled", "refunded"])
+  .default("not_required");
 
 export const createReservationRequestSchema = z
   .object({
@@ -112,7 +116,17 @@ export const reservationRequestSchema = z.object({
   nights: z.number().int().min(1).max(90).default(1),
   pricePerNight: z.number().int().min(0).max(1_000_000).default(0),
   estimatedTotal: z.number().int().min(0).max(30_000_000).default(0),
-  currency: z.literal("TRY").default("TRY")
+  currency: z.literal("TRY").default("TRY"),
+  paymentStatus: paymentStatusSchema,
+  paymentProvider: paymentProviderSchema,
+  paymentReference: storedTextSchema(140, "Ödeme referansı çok uzun."),
+  paymentAmount: z.number().int().min(0).max(30_000_000).default(0),
+  paymentCurrency: z.literal("TRY").default("TRY"),
+  paymentStartedAt: storedTextSchema(80, "Ödeme başlangıç tarihi geçersiz."),
+  paymentUpdatedAt: storedTextSchema(80, "Ödeme güncelleme tarihi geçersiz."),
+  paidAt: storedTextSchema(80, "Ödeme tarihi geçersiz."),
+  paymentFailureReason: storedTextSchema(500, "Ödeme hata mesajı çok uzun."),
+  paymentRedirectUrl: storedTextSchema(900, "Ödeme bağlantısı çok uzun.")
 });
 
 export const updateReservationRequestSchema = z
@@ -142,5 +156,7 @@ export const updateReservationRequestSchema = z
 
 export type AdminCreateReservationInput = z.infer<typeof adminCreateReservationSchema>;
 export type CreateReservationRequestInput = z.infer<typeof createReservationRequestSchema>;
+export type PaymentProvider = z.infer<typeof paymentProviderSchema>;
+export type PaymentStatus = z.infer<typeof paymentStatusSchema>;
 export type ReservationStatus = z.infer<typeof reservationStatusSchema>;
 export type ReservationRequest = z.infer<typeof reservationRequestSchema>;

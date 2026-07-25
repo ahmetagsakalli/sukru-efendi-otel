@@ -133,11 +133,16 @@ async function startServer() {
     ADMIN_PASSWORD: serverMode === "start" ? adminPassword : "",
     ADMIN_PASSWORD_HASH: "",
     ADMIN_SESSION_SECRET: serverMode === "start" ? "admin-smoke-session-secret-2026" : "",
+    BLOB_READ_WRITE_TOKEN: "",
     HOSTNAME: "127.0.0.1",
+    PAYMENT_BASE_URL: baseURL,
+    PAYMENT_MOCK_SECRET: "admin-smoke-payment-secret-2026",
+    PAYMENT_PROVIDER: "mock",
     PORT: String(port),
     SITE_CONTENT_DIR: tmpContentDir,
     SITE_CONTENT_FILE: tmpContentFile,
-    RESERVATION_REQUESTS_FILE: tmpReservationFile
+    RESERVATION_REQUESTS_FILE: tmpReservationFile,
+    VERCEL_OIDC_TOKEN: ""
   };
 
   const args = serverMode === "start" ? ["start"] : ["dev", "--hostname", "127.0.0.1", "--port", String(port)];
@@ -329,6 +334,53 @@ async function checkPublicReservationValidation(page) {
   });
 
   expect(honeypot.status()).toBe(200);
+}
+
+async function checkPaymentInfrastructure(page, iteration) {
+  const reservationResponse = await page.request.post(`${baseURL}/api/reservations`, {
+    data: {
+      checkIn: "2026-09-01",
+      checkOut: "2026-09-03",
+      roomSlug: "standart-oda",
+      adults: 2,
+      children: 0,
+      name: `Payment Smoke ${iteration}`,
+      phone: "+90 555 400 50 60",
+      email: "payment-smoke@example.com",
+      note: "",
+      website: ""
+    }
+  });
+
+  expect(reservationResponse.ok(), `Payment reservation failed with ${reservationResponse.status()}`).toBeTruthy();
+  const reservationJson = await reservationResponse.json();
+  assert(reservationJson.reservation?.id, "Payment reservation response did not include an id.");
+  expect(reservationJson.payment?.required).toBe(true);
+  expect(reservationJson.payment?.status).toBe("pending");
+
+  const paymentResponse = await page.request.post(`${baseURL}/api/payments/create`, {
+    data: {
+      reservationId: reservationJson.reservation.id
+    }
+  });
+
+  expect(paymentResponse.ok(), `Payment session create failed with ${paymentResponse.status()}`).toBeTruthy();
+  const paymentJson = await paymentResponse.json();
+  assert(paymentJson.payment?.redirectUrl, "Payment session did not include a redirect URL.");
+  expect(paymentJson.payment.provider).toBe("mock");
+  expect(paymentJson.payment.status).toBe("processing");
+
+  const paymentUrl = new URL(paymentJson.payment.redirectUrl);
+  const completeResponse = await page.request.post(`${baseURL}/api/payments/mock/complete`, {
+    form: {
+      reference: paymentUrl.searchParams.get("reference") ?? "",
+      reservationId: paymentUrl.searchParams.get("reservationId") ?? "",
+      result: "success",
+      token: paymentUrl.searchParams.get("token") ?? ""
+    }
+  });
+
+  expect(completeResponse.status(), `Mock payment complete failed with ${completeResponse.status()}`).toBeLessThan(400);
 }
 
 async function checkOverview(page, imagePath, iteration) {
@@ -622,6 +674,7 @@ async function runIteration(browser, iteration, imageA, imageB, invalidImage) {
   expect(unauthorized.status()).toBe(401);
   await checkSecurityHeaders(page);
   await checkPublicReservationValidation(page);
+  await checkPaymentInfrastructure(page, iteration);
   await loginOrSetup(page);
   await checkDashboardShell(page);
   await checkOverview(page, imageA, iteration);

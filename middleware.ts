@@ -21,7 +21,7 @@ function applySecurityHeaders(response: NextResponse) {
       "img-src 'self' data: blob:",
       "font-src 'self' data:",
       `connect-src ${connectSrc}`,
-      "frame-src https://maps.google.com https://www.google.com",
+      "frame-src https://maps.google.com https://www.google.com https://www.paytr.com",
       "frame-ancestors 'self'",
       "base-uri 'self'",
       "form-action 'self'"
