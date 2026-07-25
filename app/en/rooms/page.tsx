@@ -3,9 +3,9 @@ import { getPageMetadata } from "@/lib/i18n";
 import { getSiteContent } from "@/lib/site-content";
 
 export async function generateMetadata() {
-  return getPageMetadata(await getSiteContent(), "tr", "rooms");
+  return getPageMetadata(await getSiteContent(), "en", "rooms");
 }
 
-export default function RoomsPage() {
-  return <PublicRoomsPage locale="tr" />;
+export default function EnglishRoomsPage() {
+  return <PublicRoomsPage locale="en" />;
 }

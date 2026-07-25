@@ -3,6 +3,12 @@
 import Image from "next/image";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import {
+  defaultLocale,
+  getPublicCopy,
+  interpolate,
+  type PublicLocale
+} from "@/lib/i18n";
 
 type GalleryLightboxItem = {
   title: string;
@@ -12,12 +18,14 @@ type GalleryLightboxItem = {
 
 type GalleryLightboxProps = {
   items: readonly GalleryLightboxItem[];
+  locale?: PublicLocale;
 };
 
-export function GalleryLightbox({ items }: GalleryLightboxProps) {
+export function GalleryLightbox({ items, locale = defaultLocale }: GalleryLightboxProps) {
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const [isMounted, setIsMounted] = useState(false);
   const activeItem = activeIndex === null ? null : items[activeIndex];
+  const copy = getPublicCopy(locale);
 
   const close = () => setActiveIndex(null);
   const showPrevious = () =>
@@ -71,14 +79,14 @@ export function GalleryLightbox({ items }: GalleryLightboxProps) {
             <button
               className="gallery-lightbox__backdrop"
               type="button"
-              aria-label="Galeriyi kapat"
+              aria-label={copy.gallery.close}
               onClick={close}
             />
             <div className="gallery-lightbox__stage">
               <button
                 className="gallery-lightbox__control gallery-lightbox__control--close"
                 type="button"
-                aria-label="Galeriyi kapat"
+                aria-label={copy.gallery.close}
                 onClick={close}
               >
                 ×
@@ -86,7 +94,7 @@ export function GalleryLightbox({ items }: GalleryLightboxProps) {
               <button
                 className="gallery-lightbox__control gallery-lightbox__control--previous"
                 type="button"
-                aria-label="Önceki görsel"
+                aria-label={copy.gallery.previous}
                 onClick={showPrevious}
               >
                 ‹
@@ -104,7 +112,7 @@ export function GalleryLightbox({ items }: GalleryLightboxProps) {
               <button
                 className="gallery-lightbox__control gallery-lightbox__control--next"
                 type="button"
-                aria-label="Sonraki görsel"
+                aria-label={copy.gallery.next}
                 onClick={showNext}
               >
                 ›
@@ -118,13 +126,13 @@ export function GalleryLightbox({ items }: GalleryLightboxProps) {
 
   return (
     <>
-      <section className="section gallery-grid" aria-label="Galeri">
+      <section className="section gallery-grid" aria-label={copy.gallery.aria}>
         {items.map((item, index) => (
           <button
             key={item.image}
             className={`gallery-grid__button visual-panel visual-panel--${item.tone}`}
             type="button"
-            aria-label={`${item.title} görselini büyüt`}
+            aria-label={interpolate(copy.gallery.enlarge, { title: item.title })}
             onClick={() => setActiveIndex(index)}
           >
             <Image

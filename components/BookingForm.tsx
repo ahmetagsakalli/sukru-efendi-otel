@@ -1,7 +1,13 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { getGuestCount, getRoomCapacityLimit } from "@/lib/booking";
+import { BOOKING_CURRENCY, getGuestCount, getRoomCapacityLimit } from "@/lib/booking";
+import {
+  defaultLocale,
+  getPublicCopy,
+  interpolate,
+  type PublicLocale
+} from "@/lib/i18n";
 import type { Room } from "@/lib/site-content-schema";
 
 type BookingFormState = {
@@ -20,9 +26,11 @@ type BookingFormState = {
 type AvailabilityRoom = {
   availableRooms: number;
   capacityLimit: number;
+  currency: string;
   estimatedTotal: number;
   isAvailable: boolean;
   nights: number;
+  pricePerNight: number;
   priceLabel: string;
   roomTitle: string;
   roomSlug: string;
@@ -56,8 +64,31 @@ function tomorrow() {
   return addDays(today(), 1);
 }
 
-export function BookingForm({ rooms }: { rooms: Room[] }) {
+const currencyLocales: Record<PublicLocale, string> = {
+  tr: "tr-TR",
+  en: "en-US",
+  de: "de-DE"
+};
+
+function formatCurrency(amount: number, locale: PublicLocale, currency = BOOKING_CURRENCY) {
+  return new Intl.NumberFormat(currencyLocales[locale], {
+    currency,
+    currencyDisplay: "narrowSymbol",
+    maximumFractionDigits: 0,
+    style: "currency"
+  }).format(amount);
+}
+
+function getNightLabel(nights: number, locale: PublicLocale, fallback: string) {
+  if (locale === "en") return nights === 1 ? "night" : "nights";
+  if (locale === "de") return nights === 1 ? "Nacht" : "Nächte";
+  return fallback;
+}
+
+export function BookingForm({ rooms, locale = defaultLocale }: { rooms: Room[]; locale?: PublicLocale }) {
   const defaultRoom = rooms[1] ?? rooms[0];
+  const copy = getPublicCopy(locale);
+  const hasInitialAvailabilityQuery = Boolean(defaultRoom?.slug);
   const [form, setForm] = useState<BookingFormState>({
     checkIn: today(),
     checkOut: tomorrow(),
@@ -72,7 +103,7 @@ export function BookingForm({ rooms }: { rooms: Room[] }) {
   });
   const [availability, setAvailability] = useState<AvailabilityRoom | null>(null);
   const [availabilityError, setAvailabilityError] = useState("");
-  const [isCheckingAvailability, setIsCheckingAvailability] = useState(false);
+  const [isCheckingAvailability, setIsCheckingAvailability] = useState(hasInitialAvailabilityQuery);
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState<"success" | "error">("success");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -87,7 +118,10 @@ export function BookingForm({ rooms }: { rooms: Room[] }) {
   const isUnavailable = selectedRoomAvailability ? !selectedRoomAvailability.isAvailable : false;
   const occupancyError =
     selectedRoom && guestCount > selectedRoomCapacity
-      ? `${selectedRoom.title} için en fazla ${selectedRoomCapacity} misafir seçilebilir.`
+      ? interpolate(copy.bookingForm.occupancyError, {
+          capacity: selectedRoomCapacity,
+          room: selectedRoom.title
+        })
       : "";
   const adultOptions = useMemo(
     () => Array.from({ length: Math.max(selectedRoomCapacity, 1) }, (_, index) => String(index + 1)),
@@ -125,7 +159,7 @@ export function BookingForm({ rooms }: { rooms: Room[] }) {
 
         if (!response.ok || !result.rooms?.[0]) {
           setAvailability(null);
-          setAvailabilityError(result.error ?? "Müsaitlik alınamadı.");
+          setAvailabilityError(locale === "tr" ? result.error ?? copy.bookingForm.availabilityFailed : copy.bookingForm.availabilityFailed);
           return;
         }
 
@@ -134,7 +168,7 @@ export function BookingForm({ rooms }: { rooms: Room[] }) {
       .catch((error) => {
         if ((error as Error).name !== "AbortError") {
           setAvailability(null);
-          setAvailabilityError("Müsaitlik alınamadı.");
+          setAvailabilityError(copy.bookingForm.availabilityFailed);
         }
       })
       .finally(() => {
@@ -183,7 +217,7 @@ export function BookingForm({ rooms }: { rooms: Room[] }) {
 
       if (selectedRoomAvailability && !selectedRoomAvailability.isAvailable) {
         setMessageType("error");
-        setMessage("Seçilen tarih aralığında bu oda için müsaitlik yok.");
+        setMessage(copy.bookingForm.unavailableSelected);
         return;
       }
 
@@ -221,13 +255,13 @@ export function BookingForm({ rooms }: { rooms: Room[] }) {
       if (!response.ok) {
         const issue = result.issues?.[0];
         setMessageType("error");
-        setMessage(issue ? issue.message : result.error ?? "Talep gönderilemedi.");
+        setMessage(locale === "tr" ? issue ? issue.message : result.error ?? copy.bookingForm.requestFailed : copy.bookingForm.requestFailed);
         return;
       }
 
       if (result.payment?.required && result.reservation?.id) {
         setMessageType("success");
-        setMessage("Rezervasyon talebiniz alındı. Güvenli ödeme ekranına yönlendiriliyorsunuz.");
+        setMessage(copy.bookingForm.paymentRedirect);
 
         const paymentResponse = await fetch("/api/payments/create", {
           method: "POST",
@@ -244,8 +278,7 @@ export function BookingForm({ rooms }: { rooms: Room[] }) {
         if (!paymentResponse.ok || !paymentResult.payment?.redirectUrl) {
           setMessageType("error");
           setMessage(
-            paymentResult.error ??
-              "Rezervasyon talebiniz alındı ancak ödeme başlatılamadı. Otel kısa süre içinde sizinle iletişime geçecek."
+            locale === "tr" ? paymentResult.error ?? copy.bookingForm.paymentStartFailed : copy.bookingForm.paymentStartFailed
           );
           return;
         }
@@ -255,10 +288,17 @@ export function BookingForm({ rooms }: { rooms: Room[] }) {
       }
 
       setMessageType("success");
+      const totalLabel =
+        selectedRoomAvailability?.estimatedTotal && selectedRoomAvailability.estimatedTotal > 0
+          ? formatCurrency(selectedRoomAvailability.estimatedTotal, locale, selectedRoomAvailability.currency)
+          : result.reservation?.totalLabel;
       setMessage(
-        result.reservation?.totalLabel
-          ? `Talebiniz alındı. Talep no ${result.reservation.id?.slice(0, 8) ?? "-"} · Tahmini toplam ${result.reservation.totalLabel}. Otel kısa süre içinde sizinle iletişime geçecek.`
-          : "Talebiniz alındı. Otel kısa süre içinde sizinle iletişime geçecek."
+        totalLabel
+          ? interpolate(copy.bookingForm.requestWithTotal, {
+              id: result.reservation?.id?.slice(0, 8) ?? "-",
+              total: totalLabel
+            })
+          : copy.bookingForm.requestWithoutTotal
       );
       setForm((current) => ({
         ...current,
@@ -270,25 +310,32 @@ export function BookingForm({ rooms }: { rooms: Room[] }) {
       }));
     } catch {
       setMessageType("error");
-      setMessage("Bağlantı kurulamadı. Lütfen telefon veya WhatsApp üzerinden bize ulaşın.");
+      setMessage(copy.bookingForm.connectionError);
     } finally {
       setIsSubmitting(false);
     }
   }
 
+  const selectedPriceLabel = selectedRoomAvailability
+    ? formatCurrency(selectedRoomAvailability.pricePerNight, locale, selectedRoomAvailability.currency)
+    : "";
+  const selectedTotalLabel = selectedRoomAvailability
+    ? formatCurrency(selectedRoomAvailability.estimatedTotal, locale, selectedRoomAvailability.currency)
+    : "";
+
   return (
-    <section className="hero-reservation" id="rezervasyon" aria-label="Rezervasyon">
+    <section className="hero-reservation" id="rezervasyon" aria-label={copy.bookingForm.ariaLabel}>
       <form className="booking-form booking-form--hero booking-form--request" onSubmit={submitReservation}>
         <label>
-          <span>Giriş</span>
+          <span>{copy.bookingForm.checkIn}</span>
           <input min={today()} onChange={(event) => updateField("checkIn", event.target.value)} required type="date" value={form.checkIn} />
         </label>
         <label>
-          <span>Çıkış</span>
+          <span>{copy.bookingForm.checkOut}</span>
           <input min={addDays(form.checkIn || today(), 1)} onChange={(event) => updateField("checkOut", event.target.value)} required type="date" value={form.checkOut} />
         </label>
         <label>
-          <span>Oda</span>
+          <span>{copy.bookingForm.room}</span>
           <select onChange={(event) => updateField("roomSlug", event.target.value)} required value={selectedRoom?.slug ?? ""}>
             {rooms.map((room) => (
               <option key={room.slug} value={room.slug}>
@@ -298,7 +345,7 @@ export function BookingForm({ rooms }: { rooms: Room[] }) {
           </select>
         </label>
         <label>
-          <span>Yetişkin</span>
+          <span>{copy.bookingForm.adults}</span>
           <select onChange={(event) => updateField("adults", event.target.value)} value={form.adults}>
             {adultOptions.map((option) => (
               <option key={option}>{option}</option>
@@ -306,7 +353,7 @@ export function BookingForm({ rooms }: { rooms: Room[] }) {
           </select>
         </label>
         <label>
-          <span>Çocuk</span>
+          <span>{copy.bookingForm.children}</span>
           <select onChange={(event) => updateField("children", event.target.value)} value={form.children}>
             {childOptions.map((option) => (
               <option key={option}>{option}</option>
@@ -314,47 +361,53 @@ export function BookingForm({ rooms }: { rooms: Room[] }) {
           </select>
         </label>
         <label>
-          <span>Ad Soyad</span>
+          <span>{copy.bookingForm.name}</span>
           <input autoComplete="name" onChange={(event) => updateField("name", event.target.value)} required type="text" value={form.name} />
         </label>
         <label>
-          <span>Telefon</span>
+          <span>{copy.bookingForm.phone}</span>
           <input autoComplete="tel" onChange={(event) => updateField("phone", event.target.value)} required type="tel" value={form.phone} />
         </label>
         <label>
-          <span>E-posta</span>
+          <span>{copy.bookingForm.email}</span>
           <input autoComplete="email" onChange={(event) => updateField("email", event.target.value)} type="email" value={form.email} />
         </label>
         <label className="booking-form__note">
-          <span>Not</span>
+          <span>{copy.bookingForm.note}</span>
           <input onChange={(event) => updateField("note", event.target.value)} type="text" value={form.note} />
         </label>
         <div className={`booking-form__summary${occupancyError || isUnavailable || availabilityError ? " booking-form__summary--warning" : ""}`}>
           <strong>
             {occupancyError
-              ? "Kapasite aşıldı"
+              ? copy.bookingForm.capacityExceeded
               : isCheckingAvailability
-              ? "Müsaitlik kontrol ediliyor"
+              ? copy.bookingForm.checkingAvailability
               : availabilityError
-                ? "Müsaitlik alınamadı"
+                ? copy.bookingForm.availabilityFailed
                 : selectedRoomAvailability?.isAvailable
-                  ? selectedRoomAvailability.totalLabel
-                  : "Müsait oda yok"}
+                  ? selectedTotalLabel
+                  : copy.bookingForm.unavailable}
           </strong>
           <span>
             {occupancyError
               ? occupancyError
               : selectedRoomAvailability?.isAvailable
-                ? `${selectedRoomAvailability.nights} gece · ${selectedRoomAvailability.availableRooms}/${selectedRoomAvailability.totalRooms} oda müsait · ${selectedRoomAvailability.priceLabel} / gece · ${guestCount}/${selectedRoomCapacity} misafir`
-                : availabilityError || "Farklı tarih veya oda seçin"}
+                ? `${selectedRoomAvailability.nights} ${getNightLabel(selectedRoomAvailability.nights, locale, copy.bookingForm.nights)} · ${selectedRoomAvailability.availableRooms}/${selectedRoomAvailability.totalRooms} ${copy.bookingForm.roomsAvailable} · ${selectedPriceLabel} / ${copy.bookingForm.perNight} · ${guestCount}/${selectedRoomCapacity} ${copy.bookingForm.guests}`
+                : availabilityError || copy.bookingForm.noAvailabilitySuggestion}
           </span>
         </div>
         <label className="booking-form__honeypot">
-          <span>Web sitesi</span>
+          <span>{copy.bookingForm.website}</span>
           <input autoComplete="off" onChange={(event) => updateField("website", event.target.value)} tabIndex={-1} type="text" value={form.website} />
         </label>
         <button className="booking-link booking-link--solid booking-form__button" disabled={isSubmitting || isCheckingAvailability || !datesAreValid || isUnavailable || Boolean(occupancyError)} type="submit">
-          {isSubmitting ? "Gönderiliyor" : occupancyError ? "Kapasite Aşıldı" : isUnavailable ? "Uygun Tarih Seçin" : "Rezervasyon Talebi Gönder"}
+          {isSubmitting
+            ? copy.bookingForm.submitting
+            : occupancyError
+              ? copy.bookingForm.capacityExceeded
+              : isUnavailable
+                ? copy.bookingForm.chooseDate
+                : copy.bookingForm.submit}
         </button>
         {message ? <p className={`booking-form__message booking-form__message--${messageType}`}>{message}</p> : null}
       </form>

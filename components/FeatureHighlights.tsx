@@ -1,3 +1,8 @@
+import {
+  defaultLocale,
+  getPublicCopy,
+  type PublicLocale
+} from "@/lib/i18n";
 import type { RoomFeature } from "@/lib/site-content-schema";
 
 function FeatureIcon({ icon }: { icon: RoomFeature["icon"] }) {
@@ -40,9 +45,17 @@ function FeatureIcon({ icon }: { icon: RoomFeature["icon"] }) {
   );
 }
 
-export function FeatureHighlights({ features }: { features: RoomFeature[] }) {
+export function FeatureHighlights({
+  features,
+  locale = defaultLocale
+}: {
+  features: RoomFeature[];
+  locale?: PublicLocale;
+}) {
+  const copy = getPublicCopy(locale);
+
   return (
-    <div className="room-feature-highlights" aria-label="Oda içi önemli detaylar">
+    <div className="room-feature-highlights" aria-label={copy.rooms.featureAria}>
       {features.map((feature) => (
         <article className="room-feature-highlight" key={feature.title}>
           <FeatureIcon icon={feature.icon} />

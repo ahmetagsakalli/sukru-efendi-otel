@@ -4,9 +4,10 @@ import { useEffect, useState } from "react";
 
 type HeroServiceRotatorProps = {
   items: string[];
+  label?: string;
 };
 
-export function HeroServiceRotator({ items }: HeroServiceRotatorProps) {
+export function HeroServiceRotator({ items, label }: HeroServiceRotatorProps) {
   const [index, setIndex] = useState(0);
 
   useEffect(() => {
@@ -22,7 +23,7 @@ export function HeroServiceRotator({ items }: HeroServiceRotatorProps) {
   }, [items.length]);
 
   return (
-    <div className="hero-service-rotator" id="hizmetler" aria-label={`Otel hizmetleri: ${items.join(", ")}`}>
+    <div className="hero-service-rotator" id="hizmetler" aria-label={label ?? `Otel hizmetleri: ${items.join(", ")}`}>
       <span className="hero-service-rotator__text" aria-hidden="true">
         {items[index]}
       </span>

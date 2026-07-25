@@ -1,10 +1,17 @@
 import { VisualImage } from "@/components/VisualImage";
+import {
+  defaultLocale,
+  getPublicCopy,
+  type PublicLocale
+} from "@/lib/i18n";
 import type { GalleryItem } from "@/lib/site-content-schema";
 
-export function GalleryStrip({ items }: { items: GalleryItem[] }) {
+export function GalleryStrip({ items, locale = defaultLocale }: { items: GalleryItem[]; locale?: PublicLocale }) {
+  const copy = getPublicCopy(locale);
+
   return (
     <section className="section gallery-preview">
-      <div className="gallery-strip" aria-label="Otelden fotoğraflar">
+      <div className="gallery-strip" aria-label={copy.gallery.stripAria}>
         <div className="gallery-strip__scroller" role="list" tabIndex={0}>
           {items.map((item) => (
             <VisualImage

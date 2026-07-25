@@ -1,14 +1,34 @@
 import { BOOKING_CURRENCY, parseRoomPrice } from "@/lib/booking";
+import {
+  defaultLocale,
+  getBookingHref,
+  getHomeHref,
+  getRoomHref,
+  publicLocales,
+  type PublicLocale
+} from "@/lib/i18n";
 import type { SiteContent } from "@/lib/site-content-schema";
 
-export function StructuredData({ content }: { content: SiteContent }) {
+function absoluteUrl(baseUrl: string, path: string) {
+  if (path === "/") return baseUrl;
+  return `${baseUrl}${path}`;
+}
+
+export function StructuredData({
+  content,
+  locale = defaultLocale
+}: {
+  content: SiteContent;
+  locale?: PublicLocale;
+}) {
   const { rooms, roomFeatures, site, services } = content;
+  const homeUrl = absoluteUrl(site.canonicalUrl, getHomeHref(locale));
   const data = {
     "@context": "https://schema.org",
     "@type": "Hotel",
     "@id": `${site.canonicalUrl}/#hotel`,
     name: site.name,
-    url: site.canonicalUrl,
+    url: homeUrl,
     description: site.description,
     image: [
       `${site.canonicalUrl}/hotel-images/hero-facade-night.webp`,
@@ -41,11 +61,11 @@ export function StructuredData({ content }: { content: SiteContent }) {
       telephone: site.phone,
       contactType: "reservations",
       areaServed: "TR",
-      availableLanguage: ["tr"]
+      availableLanguage: publicLocales
     },
     potentialAction: {
       "@type": "ReserveAction",
-      target: `${site.canonicalUrl}/#rezervasyon`
+      target: absoluteUrl(site.canonicalUrl, getBookingHref(locale))
     },
     containsPlace: rooms.map((room) => ({
       "@type": "HotelRoom",
@@ -59,7 +79,7 @@ export function StructuredData({ content }: { content: SiteContent }) {
         availability: room.count > 0 ? "https://schema.org/InStock" : "https://schema.org/SoldOut",
         price: parseRoomPrice(room.price),
         priceCurrency: BOOKING_CURRENCY,
-        url: `${site.canonicalUrl}/odalar/${room.slug}`
+        url: absoluteUrl(site.canonicalUrl, getRoomHref(room.slug, locale))
       }
     }))
   };

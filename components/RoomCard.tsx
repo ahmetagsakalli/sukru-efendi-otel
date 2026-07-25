@@ -1,14 +1,23 @@
 import Link from "next/link";
 import { VisualImage } from "@/components/VisualImage";
+import {
+  defaultLocale,
+  getPublicCopy,
+  getRoomHref,
+  type PublicLocale
+} from "@/lib/i18n";
 import type { Room } from "@/lib/site-content-schema";
 
 type RoomCardProps = {
   room: Room;
+  locale?: PublicLocale;
 };
 
-export function RoomCard({ room }: RoomCardProps) {
+export function RoomCard({ room, locale = defaultLocale }: RoomCardProps) {
+  const copy = getPublicCopy(locale);
+
   return (
-    <Link className="room-card" href={`/odalar/${room.slug}`}>
+    <Link className="room-card" href={getRoomHref(room.slug, locale)}>
       <VisualImage
         className={`visual-panel visual-panel--${room.tone}`}
         src={room.image}
@@ -27,7 +36,7 @@ export function RoomCard({ room }: RoomCardProps) {
           <div>
             <strong>{room.price}</strong>
           </div>
-          <span className="text-link">İncele</span>
+          <span className="text-link">{copy.rooms.inspect}</span>
         </div>
       </div>
     </Link>
