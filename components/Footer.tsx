@@ -1,7 +1,9 @@
 import Link from "next/link";
-import { site } from "@/data/site";
+import { getSiteContent } from "@/lib/site-content";
 
-export function Footer() {
+export async function Footer() {
+  const { site } = await getSiteContent();
+
   return (
     <footer className="site-footer">
       <div className="footer-main">
@@ -22,7 +24,7 @@ export function Footer() {
           <a href={site.mapHref} target="_blank" rel="noreferrer">
             Haritada Aç
           </a>
-          <Link className="booking-link booking-link--outline" href="/iletisim">
+          <Link className="booking-link booking-link--outline" href="/#rezervasyon">
             REZERVASYON YAP
           </Link>
         </div>

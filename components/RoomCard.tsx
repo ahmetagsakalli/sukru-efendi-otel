@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { Room } from "@/data/site";
 import { VisualImage } from "@/components/VisualImage";
+import type { Room } from "@/lib/site-content-schema";
 
 type RoomCardProps = {
   room: Room;

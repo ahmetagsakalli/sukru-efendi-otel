@@ -1,6 +1,6 @@
-import { roomFeatures } from "@/data/site";
+import type { RoomFeature } from "@/lib/site-content-schema";
 
-function FeatureIcon({ icon }: { icon: (typeof roomFeatures)[number]["icon"] }) {
+function FeatureIcon({ icon }: { icon: RoomFeature["icon"] }) {
   if (icon === "smart-entry") {
     return (
       <svg viewBox="0 0 96 96" aria-hidden="true">
@@ -40,10 +40,10 @@ function FeatureIcon({ icon }: { icon: (typeof roomFeatures)[number]["icon"] }) 
   );
 }
 
-export function FeatureHighlights() {
+export function FeatureHighlights({ features }: { features: RoomFeature[] }) {
   return (
     <div className="room-feature-highlights" aria-label="Oda içi önemli detaylar">
-      {roomFeatures.map((feature) => (
+      {features.map((feature) => (
         <article className="room-feature-highlight" key={feature.title}>
           <FeatureIcon icon={feature.icon} />
           <div>

@@ -1,16 +1,14 @@
-import { galleryItems } from "@/data/site";
 import { VisualImage } from "@/components/VisualImage";
+import type { GalleryItem } from "@/lib/site-content-schema";
 
-export function GalleryStrip() {
-  const loopedItems = [...galleryItems, ...galleryItems.slice(0, 6)];
-
+export function GalleryStrip({ items }: { items: GalleryItem[] }) {
   return (
     <section className="section gallery-preview">
       <div className="gallery-strip" aria-label="Otelden fotoğraflar">
         <div className="gallery-strip__scroller" role="list" tabIndex={0}>
-          {loopedItems.map((item, index) => (
+          {items.map((item) => (
             <VisualImage
-              key={`${item.image}-${index}`}
+              key={item.image}
               className="gallery-strip__item"
               src={item.image}
               alt={item.title}

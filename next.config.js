@@ -3,7 +3,10 @@ const nextConfig = {
   output: "standalone",
   reactStrictMode: true,
   images: {
-    unoptimized: true
+    formats: ["image/webp"],
+    deviceSizes: [360, 640, 828, 1080, 1440, 1920],
+    imageSizes: [96, 176, 256, 384],
+    minimumCacheTTL: 31536000
   },
   async headers() {
     return [

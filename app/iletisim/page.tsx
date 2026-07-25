@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { PageIntro } from "@/components/PageIntro";
-import { site } from "@/data/site";
+import { getSiteContent } from "@/lib/site-content";
 
 export const metadata: Metadata = {
   title: "İletişim",
@@ -13,31 +13,31 @@ export const metadata: Metadata = {
     title: "İletişim | Şükrü Efendi Ottoman Hotel",
     description: "Rezervasyon, telefon, WhatsApp, e-posta ve Ordu merkez konum bilgileri.",
     url: "/iletisim",
-    images: ["/hotel-images/gallery-reception-desk.jpg"]
+    images: ["/hotel-images/gallery-reception-desk.webp"]
   }
 };
 
-export default function ContactPage() {
+export default async function ContactPage() {
+  const { pages, site } = await getSiteContent();
+
   return (
     <div className="page-transition">
-      <PageIntro title="Rezervasyon ve bilgi için otelle doğrudan görüşün.">
-        Tarih, kişi sayısı ve oda tercihinizi ileterek uygun seçenekleri hızlıca öğrenebilirsiniz.
-      </PageIntro>
+      <PageIntro title={pages.contact.title}>{pages.contact.body}</PageIntro>
       <section className="section contact-grid">
         <div className="contact-panel">
-          <h2>Doğrudan iletişim</h2>
+          <h2>{pages.contact.contactTitle}</h2>
           <div className="contact-actions">
             <a href={site.phoneHref}>{site.phone}</a>
-            <a href="tel:+905524527770">{site.whatsapp}</a>
+            <a href={site.whatsappHref}>{site.whatsapp}</a>
             <a href={site.whatsappHref}>WhatsApp</a>
             <a href={site.emailHref}>{site.email}</a>
           </div>
-          <Link className="booking-link booking-link--solid" href="/iletisim">
+          <Link className="booking-link booking-link--solid" href="/#rezervasyon">
             REZERVASYON YAP
           </Link>
         </div>
         <div className="contact-panel" id="konum">
-          <h2>Ordu şehir merkezi</h2>
+          <h2>{pages.contact.locationTitle}</h2>
           <p>{site.address}</p>
           <div className="contact-map" aria-label="Şükrü Efendi Ottoman Hotel konumu">
             <iframe

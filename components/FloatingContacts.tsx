@@ -1,6 +1,8 @@
-import { site } from "@/data/site";
+import { getSiteContent } from "@/lib/site-content";
 
-export function FloatingContacts() {
+export async function FloatingContacts() {
+  const { site } = await getSiteContent();
+
   return (
     <div className="floating-contact-actions" aria-label="Hızlı iletişim">
       <a

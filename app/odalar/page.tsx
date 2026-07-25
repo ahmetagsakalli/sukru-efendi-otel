@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { FeatureHighlights } from "@/components/FeatureHighlights";
 import { PageIntro } from "@/components/PageIntro";
 import { RoomCard } from "@/components/RoomCard";
-import { rooms } from "@/data/site";
+import { getSiteContent } from "@/lib/site-content";
 
 export const metadata: Metadata = {
   title: "Odalar",
@@ -14,19 +14,18 @@ export const metadata: Metadata = {
     title: "Odalar | Şükrü Efendi Ottoman Hotel",
     description: "Ordu merkezde standart, suit ve aile odası seçenekleri.",
     url: "/odalar",
-    images: ["/hotel-images/rooms/standard/standard-room-twin.jpg"]
+    images: ["/hotel-images/rooms/standard/standard-room-twin.webp"]
   }
 };
 
-export default function RoomsPage() {
+export default async function RoomsPage() {
+  const { pages, roomFeatures, rooms } = await getSiteContent();
+
   return (
     <div className="page-transition">
-      <PageIntro title="Şehrin merkezinde, ihtiyaca göre seçilen odalar.">
-        Her oda yalın bir konfor anlayışıyla hazırlandı. Kısa konaklama, iş seyahati veya aile
-        ziyareti için farklı kullanım biçimleri düşünülür.
-      </PageIntro>
+      <PageIntro title={pages.rooms.title}>{pages.rooms.body}</PageIntro>
       <section className="section">
-        <FeatureHighlights />
+        <FeatureHighlights features={roomFeatures} />
         <div className="room-grid room-grid--wide">
           {rooms.map((room) => (
             <RoomCard room={room} key={room.slug} />

@@ -1,6 +1,8 @@
-import { rooms, roomFeatures, site, services } from "@/data/site";
+import { BOOKING_CURRENCY, parseRoomPrice } from "@/lib/booking";
+import type { SiteContent } from "@/lib/site-content-schema";
 
-export function StructuredData() {
+export function StructuredData({ content }: { content: SiteContent }) {
+  const { rooms, roomFeatures, site, services } = content;
   const data = {
     "@context": "https://schema.org",
     "@type": "Hotel",
@@ -9,11 +11,11 @@ export function StructuredData() {
     url: site.canonicalUrl,
     description: site.description,
     image: [
-      `${site.canonicalUrl}/hotel-images/hero-facade-night.jpg`,
-      `${site.canonicalUrl}/hotel-images/gallery-reception-desk.jpg`,
-      `${site.canonicalUrl}/hotel-images/gallery-room-wide.jpg`
+      `${site.canonicalUrl}/hotel-images/hero-facade-night.webp`,
+      `${site.canonicalUrl}/hotel-images/gallery-reception-desk.webp`,
+      `${site.canonicalUrl}/hotel-images/gallery-room-wide.webp`
     ],
-    logo: `${site.canonicalUrl}/brand/sukru-efendi-logo.png`,
+    logo: `${site.canonicalUrl}/brand/sukru-efendi-logo.webp`,
     telephone: site.phone,
     email: site.email,
     numberOfRooms: 18,
@@ -41,13 +43,24 @@ export function StructuredData() {
       areaServed: "TR",
       availableLanguage: ["tr"]
     },
+    potentialAction: {
+      "@type": "ReserveAction",
+      target: `${site.canonicalUrl}/#rezervasyon`
+    },
     containsPlace: rooms.map((room) => ({
       "@type": "HotelRoom",
       name: room.title,
       description: room.description,
       numberOfRooms: room.count,
       occupancy: room.capacity,
-      floorSize: room.size
+      floorSize: room.size,
+      offers: {
+        "@type": "Offer",
+        availability: room.count > 0 ? "https://schema.org/InStock" : "https://schema.org/SoldOut",
+        price: parseRoomPrice(room.price),
+        priceCurrency: BOOKING_CURRENCY,
+        url: `${site.canonicalUrl}/odalar/${room.slug}`
+      }
     }))
   };
 

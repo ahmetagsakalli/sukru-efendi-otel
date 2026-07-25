@@ -1,28 +1,37 @@
 # Şükrü Efendi Ottoman Hotel
 
-Next.js App Router projesi. Site Vercel'de yayındaki Şükrü Efendi Ottoman Hotel tasarımından kaynak proje olarak yeniden kuruldu.
+Şükrü Efendi Ottoman Hotel için Next.js App Router tabanlı web sitesi ve yönetim paneli.
 
 ## Komutlar
 
 ```bash
-npm install
-npm run dev
+pnpm install
+pnpm dev
 ```
 
 Geliştirme adresi: `http://localhost:3000`
 
+## Kalite Kontrol
+
+```bash
+pnpm typecheck
+pnpm build
+pnpm test:admin
+ADMIN_SMOKE_SERVER=start ADMIN_SMOKE_REPEATS=1 pnpm test:admin
+```
+
 ## Production
 
 ```bash
-npm install
-npm run build
-npm start
+pnpm install --frozen-lockfile
+pnpm build
+pnpm start
 ```
 
 VPS'de PM2 ile çalıştırmak için:
 
 ```bash
-pm2 start npm --name sukru-efendi-otel -- start
+pm2 start pnpm --name sukru-efendi-otel -- start
 pm2 save
 ```
 

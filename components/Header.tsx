@@ -25,13 +25,12 @@ export function Header() {
       <header className="site-header">
         <Link className="brand-mark" aria-label="Ana sayfa" href="/">
           <Image
-            src="/brand/sukru-efendi-logo.png"
+            src="/brand/sukru-efendi-logo.webp"
             alt="Şükrü Efendi Ottoman Hotel"
             width={176}
             height={115}
             className="brand-logo"
             priority
-            unoptimized
           />
         </Link>
         <div className="site-header__panel">
@@ -42,7 +41,7 @@ export function Header() {
               </Link>
             ))}
           </nav>
-          <Link className="booking-link booking-link--solid site-header__booking" href="/iletisim">
+          <Link className="booking-link booking-link--solid site-header__booking" href="/#rezervasyon">
             REZERVASYON YAP
           </Link>
         </div>
@@ -74,7 +73,7 @@ export function Header() {
         ))}
         <Link
           className="booking-link booking-link--solid"
-          href="/iletisim"
+          href="/#rezervasyon"
           onClick={() => setIsOpen(false)}
         >
           REZERVASYON YAP

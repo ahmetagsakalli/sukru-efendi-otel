@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { FeatureHighlights } from "@/components/FeatureHighlights";
 import { RoomCard } from "@/components/RoomCard";
 import { VisualImage } from "@/components/VisualImage";
-import { rooms } from "@/data/site";
+import { getSiteContent } from "@/lib/site-content";
 
 type RoomPageProps = {
   params: {
@@ -12,11 +12,10 @@ type RoomPageProps = {
   };
 };
 
-export function generateStaticParams() {
-  return rooms.map((room) => ({ slug: room.slug }));
-}
+export const dynamic = "force-dynamic";
 
-export function generateMetadata({ params }: RoomPageProps): Metadata {
+export async function generateMetadata({ params }: RoomPageProps): Promise<Metadata> {
+  const { rooms, site } = await getSiteContent();
   const room = rooms.find((item) => item.slug === params.slug);
 
   if (!room) {
@@ -30,7 +29,7 @@ export function generateMetadata({ params }: RoomPageProps): Metadata {
       canonical: `/odalar/${room.slug}`
     },
     openGraph: {
-      title: `${room.title} | Şükrü Efendi Ottoman Hotel`,
+      title: `${room.title} | ${site.name}`,
       description: room.description,
       url: `/odalar/${room.slug}`,
       images: [room.image]
@@ -38,7 +37,8 @@ export function generateMetadata({ params }: RoomPageProps): Metadata {
   };
 }
 
-export default function RoomDetailPage({ params }: RoomPageProps) {
+export default async function RoomDetailPage({ params }: RoomPageProps) {
+  const { roomFeatures, rooms, site } = await getSiteContent();
   const room = rooms.find((item) => item.slug === params.slug);
 
   if (!room) {
@@ -61,7 +61,7 @@ export default function RoomDetailPage({ params }: RoomPageProps) {
           <Link className="room-detail-back" href="/odalar">
             Odalara dön
           </Link>
-          <p className="room-detail-kicker">Şükrü Efendi Ottoman Hotel</p>
+          <p className="room-detail-kicker">{site.name}</p>
           <h1>{room.title}</h1>
           <p>{room.description}</p>
           <div className="room-detail-metrics">
@@ -70,7 +70,7 @@ export default function RoomDetailPage({ params }: RoomPageProps) {
             <span>{room.bed}</span>
           </div>
           <div className="room-detail-actions">
-            <Link className="booking-link booking-link--glass" href="/iletisim">
+            <Link className="booking-link booking-link--glass" href="/#rezervasyon">
               Rezervasyon Yap
             </Link>
           </div>
@@ -104,7 +104,7 @@ export default function RoomDetailPage({ params }: RoomPageProps) {
         <div className="section-title section-title--center">
           <h2>Odada öne çıkan detaylar</h2>
         </div>
-        <FeatureHighlights />
+        <FeatureHighlights features={roomFeatures} />
       </section>
 
       <section className="section room-detail-summary">
@@ -119,7 +119,7 @@ export default function RoomDetailPage({ params }: RoomPageProps) {
         <aside className="room-detail-reservation">
           <p>Doğrudan rezervasyon</p>
           <h2>{room.price}</h2>
-          <Link className="booking-link booking-link--solid" href="/iletisim">
+          <Link className="booking-link booking-link--solid" href="/#rezervasyon">
             Rezervasyon Yap
           </Link>
         </aside>

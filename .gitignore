@@ -4,6 +4,10 @@ out/
 dist/
 .env*
 !.env.example
+content/.admin-auth.json
+content/backups/
+content/reservation-backups/
+content/reservation-requests.json
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*

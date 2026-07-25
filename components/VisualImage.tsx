@@ -23,7 +23,6 @@ export function VisualImage({
         fill
         priority={priority}
         sizes={sizes}
-        unoptimized
       />
     </figure>
   );

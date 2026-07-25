@@ -77,15 +77,15 @@ export const rooms: Room[] = [
     capacity: "3 kişiye kadar",
     bed: "Tek veya çift kişilik yatak",
     price: "₺2.900",
-    image: "/hotel-images/rooms/standard/standard-room-twin.jpg",
+    image: "/hotel-images/rooms/standard/standard-room-twin.webp",
     tone: "room",
     gallery: [
-      "/hotel-images/rooms/standard/standard-room-twin.jpg",
-      "/hotel-images/rooms/standard/standard-room-wide.jpg",
-      "/hotel-images/rooms/standard/standard-room-double-stone.jpg",
-      "/hotel-images/rooms/standard/standard-room-city-view.jpg",
-      "/hotel-images/rooms/standard/standard-room-bathroom.jpg",
-      "/hotel-images/rooms/standard/standard-room-safe-minibar.jpg"
+      "/hotel-images/rooms/standard/standard-room-twin.webp",
+      "/hotel-images/rooms/standard/standard-room-wide.webp",
+      "/hotel-images/rooms/standard/standard-room-double-stone.webp",
+      "/hotel-images/rooms/standard/standard-room-city-view.webp",
+      "/hotel-images/rooms/standard/standard-room-bathroom.webp",
+      "/hotel-images/rooms/standard/standard-room-safe-minibar.webp"
     ],
     amenities: [
       "Akıllı giriş",
@@ -108,15 +108,15 @@ export const rooms: Room[] = [
     capacity: "3 kişiye kadar",
     bed: "Geniş yatak ve oturma alanı",
     price: "₺4.600",
-    image: "/hotel-images/rooms/suite/suite-room-bathroom-view.jpg",
+    image: "/hotel-images/rooms/suite/suite-room-bathroom-view.webp",
     tone: "suite",
     gallery: [
-      "/hotel-images/rooms/suite/suite-room-bathroom-view.jpg",
-      "/hotel-images/rooms/suite/suite-room-jacuzzi-wide.jpg",
-      "/hotel-images/rooms/suite/suite-jacuzzi-window.jpg",
-      "/hotel-images/rooms/suite/suite-bathroom-wide.jpg",
-      "/hotel-images/rooms/suite/suite-room-headboard.jpg",
-      "/hotel-images/rooms/suite/suite-wardrobe-safe.jpg"
+      "/hotel-images/rooms/suite/suite-room-bathroom-view.webp",
+      "/hotel-images/rooms/suite/suite-room-jacuzzi-wide.webp",
+      "/hotel-images/rooms/suite/suite-jacuzzi-window.webp",
+      "/hotel-images/rooms/suite/suite-bathroom-wide.webp",
+      "/hotel-images/rooms/suite/suite-room-headboard.webp",
+      "/hotel-images/rooms/suite/suite-wardrobe-safe.webp"
     ],
     amenities: [
       "Akıllı giriş",
@@ -139,15 +139,15 @@ export const rooms: Room[] = [
     capacity: "4 kişiye kadar",
     bed: "Aile kullanımına uygun düzen",
     price: "₺5.200",
-    image: "/hotel-images/rooms/family/family-room-main.jpg",
+    image: "/hotel-images/rooms/family/family-room-main.webp",
     tone: "family",
     gallery: [
-      "/hotel-images/rooms/family/family-room-main.jpg",
-      "/hotel-images/rooms/family/family-room-wide.jpg",
-      "/hotel-images/rooms/family/family-room-bed-sofa.jpg",
-      "/hotel-images/rooms/family/family-bathroom-wide.jpg",
-      "/hotel-images/rooms/family/family-safe.jpg",
-      "/hotel-images/rooms/family/family-smart-entry.jpg"
+      "/hotel-images/rooms/family/family-room-main.webp",
+      "/hotel-images/rooms/family/family-room-wide.webp",
+      "/hotel-images/rooms/family/family-room-bed-sofa.webp",
+      "/hotel-images/rooms/family/family-bathroom-wide.webp",
+      "/hotel-images/rooms/family/family-safe.webp",
+      "/hotel-images/rooms/family/family-smart-entry.webp"
     ],
     amenities: [
       "Akıllı giriş",
@@ -161,20 +161,20 @@ export const rooms: Room[] = [
 ];
 
 export const galleryItems = [
-  { title: "Dış cephe", tone: "facade", image: "/hotel-images/hero-facade-night.jpg" },
-  { title: "Oda geniş görünüm", tone: "room", image: "/hotel-images/gallery-room-suite-wide.jpg" },
-  { title: "Taş duvar ve perde", tone: "suite", image: "/hotel-images/gallery-window-curtain.jpg" },
-  { title: "Resepsiyon", tone: "courtyard", image: "/hotel-images/gallery-reception-desk.jpg" },
-  { title: "Şehir merkezinde cephe", tone: "facade", image: "/hotel-images/gallery-city-center.jpg" },
-  { title: "Oda kartı", tone: "detail", image: "/hotel-images/gallery-room-card.jpg" },
-  { title: "Gece cephe", tone: "city", image: "/hotel-images/gallery-facade-night-new.jpg" },
-  { title: "Oda içi kasa", tone: "suite", image: "/hotel-images/gallery-safe-close.jpg" },
-  { title: "Köşe cephe", tone: "facade", image: "/hotel-images/gallery-facade-corner-day.jpg" },
-  { title: "Aydınlatma detayı", tone: "detail", image: "/hotel-images/gallery-lamps-painting.jpg" },
-  { title: "Oda üst görünüm", tone: "room", image: "/hotel-images/gallery-room-upper-view.jpg" },
-  { title: "Oda düzeni", tone: "room", image: "/hotel-images/gallery-room-wide.jpg" },
-  { title: "Oda ikramları", tone: "family", image: "/hotel-images/gallery-amenities.jpg" },
-  { title: "Banyo", tone: "family", image: "/hotel-images/bathroom.jpg" },
-  { title: "Karşılama", tone: "breakfast", image: "/hotel-images/key-welcome.jpg" },
-  { title: "Google değerlendirme", tone: "detail", image: "/hotel-images/gallery-google-review.jpg" }
+  { title: "Dış cephe", tone: "facade", image: "/hotel-images/hero-facade-night.webp" },
+  { title: "Oda geniş görünüm", tone: "room", image: "/hotel-images/gallery-room-suite-wide.webp" },
+  { title: "Taş duvar ve perde", tone: "suite", image: "/hotel-images/gallery-window-curtain.webp" },
+  { title: "Resepsiyon", tone: "courtyard", image: "/hotel-images/gallery-reception-desk.webp" },
+  { title: "Şehir merkezinde cephe", tone: "facade", image: "/hotel-images/gallery-city-center.webp" },
+  { title: "Oda kartı", tone: "detail", image: "/hotel-images/gallery-room-card.webp" },
+  { title: "Gece cephe", tone: "city", image: "/hotel-images/gallery-facade-night-new.webp" },
+  { title: "Oda içi kasa", tone: "suite", image: "/hotel-images/gallery-safe-close.webp" },
+  { title: "Köşe cephe", tone: "facade", image: "/hotel-images/gallery-facade-corner-day.webp" },
+  { title: "Aydınlatma detayı", tone: "detail", image: "/hotel-images/gallery-lamps-painting.webp" },
+  { title: "Oda üst görünüm", tone: "room", image: "/hotel-images/gallery-room-upper-view.webp" },
+  { title: "Oda düzeni", tone: "room", image: "/hotel-images/gallery-room-wide.webp" },
+  { title: "Oda ikramları", tone: "family", image: "/hotel-images/gallery-amenities.webp" },
+  { title: "Banyo", tone: "family", image: "/hotel-images/bathroom.webp" },
+  { title: "Karşılama", tone: "breakfast", image: "/hotel-images/key-welcome.webp" },
+  { title: "Google değerlendirme", tone: "detail", image: "/hotel-images/gallery-google-review.webp" }
 ] as const;

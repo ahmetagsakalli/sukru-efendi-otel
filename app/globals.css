@@ -26,7 +26,7 @@
 
   .static-mobile-nav a {
     color: #fff;
-    font-family: var(--font-display), serif;
+    font-family: var(--font-accent), Arial, Helvetica, sans-serif;
     font-size: 0.92rem;
     letter-spacing: 0.08em;
     padding: 13px 10px;
@@ -54,4 +54,1183 @@
   .mobile-menu-toggle.is-open span:nth-child(3) {
     transform: translateY(-7px) rotate(-45deg);
   }
+}
+
+body {
+  --font-inter: var(--font-body);
+  --font-display: var(--font-heading);
+  --default-font-family: var(--font-body);
+  font-family: var(--font-body), Arial, Helvetica, sans-serif;
+}
+
+h1,
+h2,
+h3,
+.footer-title,
+.room-detail-copy p,
+.room-detail-other__grid span {
+  font-family: var(--font-heading), Georgia, serif;
+}
+
+.main-nav a,
+.booking-link,
+.mobile-menu-panel a,
+.static-mobile-nav a,
+.footer-kicker,
+.page-intro__kicker,
+.room-detail-kicker,
+.booking-form label span,
+.room-detail-metrics span,
+.room-detail-reservation p,
+.footer-links a,
+.footer-contact a,
+.contact-actions a,
+.amenity-list li,
+.room-stats__item span {
+  font-family: var(--font-accent), Arial, Helvetica, sans-serif;
+}
+
+.page-transition {
+  animation: pageFadeIn 0.34s ease both;
+}
+
+.route-transition {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  pointer-events: none;
+  background: rgba(245, 245, 240, 0.72);
+  animation: routeTransitionFade 0.28s ease both;
+}
+
+@keyframes pageFadeIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes routeTransitionFade {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 0.82;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-transition,
+  .route-transition {
+    animation: none;
+  }
+}
+
+.admin-auth,
+.admin-dashboard {
+  --admin-bg: #eef0ec;
+  --admin-panel: #fffdf8;
+  --admin-panel-soft: #f7f3ea;
+  --admin-ink: #17202a;
+  --admin-muted: #68717c;
+  --admin-line: #d8d0c1;
+  --admin-green: #1f433d;
+  --admin-blue: #1b4965;
+  --admin-gold: #b8863b;
+  --admin-red: #a44335;
+  color: var(--admin-ink);
+  font-family: var(--font-body), Arial, Helvetica, sans-serif;
+}
+
+.admin-auth {
+  align-items: center;
+  background:
+    linear-gradient(135deg, rgba(31, 67, 61, 0.12), rgba(184, 134, 59, 0.1)),
+    var(--admin-bg);
+  display: grid;
+  min-height: 100svh;
+  padding: 28px;
+}
+
+.admin-auth-card {
+  background: var(--admin-panel);
+  border: 1px solid var(--admin-line);
+  border-radius: 8px;
+  box-shadow: 0 24px 70px rgba(23, 32, 42, 0.14);
+  display: grid;
+  gap: 18px;
+  justify-self: center;
+  max-width: 440px;
+  padding: 34px;
+  width: 100%;
+}
+
+.admin-auth-icon {
+  align-items: center;
+  background: var(--admin-green);
+  border-radius: 8px;
+  color: var(--white);
+  display: inline-flex;
+  height: 48px;
+  justify-content: center;
+  width: 48px;
+}
+
+.admin-auth-card h1,
+.admin-topbar h1,
+.admin-section-heading h2 {
+  color: var(--admin-ink);
+  font-family: var(--font-heading), Georgia, serif;
+  margin: 0;
+}
+
+.admin-auth-card h1 {
+  font-size: 34px;
+  line-height: 1.12;
+}
+
+.admin-auth-note,
+.admin-kicker {
+  color: var(--admin-muted);
+  margin: 0;
+}
+
+.admin-kicker {
+  letter-spacing: 0.16em;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.admin-auth-note {
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.admin-dashboard {
+  background: var(--admin-bg);
+  display: grid;
+  grid-template-columns: 270px minmax(0, 1fr);
+  min-height: 100svh;
+}
+
+.admin-sidebar {
+  background: #152824;
+  color: var(--white);
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  min-height: 100svh;
+  padding: 24px 18px;
+  position: sticky;
+  top: 0;
+}
+
+.admin-brand {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  min-width: 0;
+}
+
+.admin-brand > span {
+  align-items: center;
+  background: var(--admin-gold);
+  border-radius: 8px;
+  display: inline-flex;
+  flex: 0 0 42px;
+  font-family: var(--font-heading), Georgia, serif;
+  font-size: 19px;
+  height: 42px;
+  justify-content: center;
+}
+
+.admin-brand strong,
+.admin-brand small {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-brand strong {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.admin-brand small {
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 12px;
+  margin-top: 2px;
+}
+
+.admin-nav {
+  display: grid;
+  gap: 8px;
+}
+
+.admin-nav button {
+  align-items: center;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  color: rgba(255, 255, 255, 0.76);
+  cursor: pointer;
+  display: flex;
+  gap: 11px;
+  min-height: 44px;
+  padding: 0 12px;
+  text-align: left;
+  transition: background 0.18s, border-color 0.18s, color 0.18s;
+}
+
+.admin-nav button:hover,
+.admin-nav button.is-active {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.14);
+  color: var(--white);
+}
+
+.admin-workspace {
+  display: grid;
+  gap: 18px;
+  padding: 26px;
+}
+
+.admin-topbar {
+  align-items: center;
+  display: flex;
+  gap: 20px;
+  justify-content: space-between;
+}
+
+.admin-topbar h1 {
+  font-size: 36px;
+  line-height: 1.1;
+  margin-top: 5px;
+}
+
+.admin-topbar-actions,
+.admin-inline-actions,
+.admin-row-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.admin-primary-button,
+.admin-secondary-button,
+.admin-danger-button,
+.admin-upload-button,
+.admin-icon-button {
+  align-items: center;
+  border-radius: 7px;
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 14px;
+  font-weight: 700;
+  gap: 8px;
+  justify-content: center;
+  min-height: 42px;
+  padding: 0 15px;
+  transition: transform 0.16s, background 0.16s, border-color 0.16s;
+}
+
+.admin-primary-button:hover,
+.admin-secondary-button:hover,
+.admin-danger-button:hover,
+.admin-upload-button:hover,
+.admin-icon-button:hover {
+  transform: translateY(-1px);
+}
+
+.admin-primary-button {
+  background: var(--admin-green);
+  border: 1px solid var(--admin-green);
+  color: var(--white);
+}
+
+.admin-primary-button:disabled,
+.admin-upload-button:has(input:disabled) {
+  cursor: wait;
+  opacity: 0.7;
+  transform: none;
+}
+
+.admin-secondary-button {
+  background: var(--admin-panel);
+  border: 1px solid var(--admin-line);
+  color: var(--admin-ink);
+}
+
+.admin-danger-button {
+  background: #fff8f5;
+  border: 1px solid rgba(164, 67, 53, 0.28);
+  color: var(--admin-red);
+}
+
+.admin-icon-button {
+  background: var(--admin-panel);
+  border: 1px solid var(--admin-line);
+  color: var(--admin-ink);
+  height: 38px;
+  min-height: 38px;
+  padding: 0;
+  width: 38px;
+}
+
+.admin-icon-button--danger {
+  color: var(--admin-red);
+}
+
+.admin-upload-button {
+  background: var(--admin-blue);
+  border: 1px solid var(--admin-blue);
+  color: var(--white);
+  min-width: 138px;
+  overflow: hidden;
+  position: relative;
+}
+
+.admin-upload-button--inline {
+  min-width: 0;
+  width: 100%;
+}
+
+.admin-upload-button input {
+  cursor: pointer;
+  inset: 0;
+  opacity: 0;
+  position: absolute;
+}
+
+.admin-stat-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.admin-stat,
+.admin-panel-section {
+  background: var(--admin-panel);
+  border: 1px solid var(--admin-line);
+  border-radius: 8px;
+}
+
+.admin-stat {
+  display: grid;
+  gap: 8px;
+  min-height: 92px;
+  padding: 18px;
+}
+
+.admin-stat span,
+.admin-section-heading span,
+.admin-field > span {
+  color: var(--admin-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.admin-stat strong {
+  color: var(--admin-green);
+  font-family: var(--font-heading), Georgia, serif;
+  font-size: 30px;
+  line-height: 1;
+}
+
+.admin-alert {
+  border-radius: 7px;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.5;
+  margin: 0;
+  padding: 13px 15px;
+}
+
+.admin-alert--success {
+  background: #edf7ef;
+  border: 1px solid #b8d8bc;
+  color: #1f6232;
+}
+
+.admin-alert--error {
+  background: #fff4f1;
+  border: 1px solid #e3b8ae;
+  color: var(--admin-red);
+}
+
+.admin-section-stack {
+  display: grid;
+  gap: 18px;
+}
+
+.admin-panel-section {
+  display: grid;
+  gap: 18px;
+  padding: 20px;
+}
+
+.admin-section-heading,
+.admin-list-heading {
+  align-items: center;
+  display: flex;
+  gap: 14px;
+  justify-content: space-between;
+}
+
+.admin-section-heading h2 {
+  font-size: 26px;
+  line-height: 1.15;
+}
+
+.admin-form-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.admin-field {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.admin-field--wide {
+  grid-column: 1 / -1;
+}
+
+.admin-field input,
+.admin-field textarea,
+.admin-field select,
+.admin-string-row input {
+  background: #fbfaf6;
+  border: 1px solid var(--admin-line);
+  border-radius: 6px;
+  color: var(--admin-ink);
+  min-height: 42px;
+  outline: none;
+  padding: 10px 12px;
+  width: 100%;
+}
+
+.admin-field textarea {
+  min-height: 108px;
+  resize: vertical;
+}
+
+.admin-field input:focus,
+.admin-field textarea:focus,
+.admin-field select:focus,
+.admin-string-row input:focus {
+  border-color: var(--admin-gold);
+  box-shadow: 0 0 0 3px rgba(184, 134, 59, 0.16);
+}
+
+.admin-image-picker {
+  align-items: center;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 112px minmax(0, 1fr);
+  min-width: 0;
+}
+
+.admin-image-picker--no-preview {
+  grid-template-columns: 1fr;
+}
+
+.admin-image-picker__controls {
+  align-items: center;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(150px, 0.42fr) minmax(0, 1fr);
+  min-width: 0;
+}
+
+.admin-image-preview {
+  background: #ddd6c8;
+  border: 1px solid var(--admin-line);
+  border-radius: 7px;
+  height: 68px;
+  overflow: hidden;
+  position: relative;
+  width: 92px;
+}
+
+.admin-image-preview img {
+  object-fit: cover;
+}
+
+.admin-rooms-layout {
+  align-items: flex-start;
+  display: grid;
+  gap: 18px;
+  grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
+}
+
+.admin-room-list {
+  background: var(--admin-panel);
+  border: 1px solid var(--admin-line);
+  border-radius: 8px;
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  position: sticky;
+  top: 20px;
+}
+
+.admin-room-tab {
+  background: #fbfaf6;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  cursor: pointer;
+  display: grid;
+  gap: 5px;
+  min-height: 62px;
+  padding: 12px;
+  text-align: left;
+}
+
+.admin-room-tab.is-active {
+  border-color: var(--admin-gold);
+  box-shadow: inset 3px 0 0 var(--admin-gold);
+}
+
+.admin-room-tab span {
+  font-weight: 800;
+}
+
+.admin-room-tab small,
+.admin-image-tile small {
+  color: var(--admin-muted);
+}
+
+.admin-array-block,
+.admin-string-list,
+.admin-feature-list,
+.admin-gallery-editor,
+.admin-image-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.admin-string-row {
+  align-items: center;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.admin-media-row {
+  align-items: end;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.admin-feature-editor {
+  align-items: flex-start;
+  background: var(--admin-panel-soft);
+  border: 1px solid var(--admin-line);
+  border-radius: 8px;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 170px minmax(180px, 0.5fr) minmax(0, 1fr) auto;
+  padding: 14px;
+}
+
+.admin-gallery-editor {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.admin-gallery-item {
+  background: var(--admin-panel-soft);
+  border: 1px solid var(--admin-line);
+  border-radius: 8px;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 112px minmax(0, 1fr) auto;
+  padding: 14px;
+}
+
+.admin-gallery-item .admin-image-preview {
+  height: 96px;
+  width: 112px;
+}
+
+.admin-gallery-item__fields {
+  display: grid;
+  gap: 10px;
+}
+
+.admin-image-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.admin-image-tile {
+  background: var(--admin-panel-soft);
+  border: 1px solid var(--admin-line);
+  border-radius: 8px;
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding: 12px;
+}
+
+.admin-image-tile .admin-image-preview {
+  aspect-ratio: 4 / 3;
+  height: auto;
+  width: 100%;
+}
+
+.admin-image-tile strong {
+  display: block;
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-loading {
+  background: linear-gradient(90deg, rgba(31, 67, 61, 0), rgba(31, 67, 61, 0.18), rgba(31, 67, 61, 0));
+  height: 3px;
+  overflow: hidden;
+  position: fixed;
+  inset: 0 0 auto;
+  z-index: 100;
+}
+
+@media (max-width: 1180px) {
+  .admin-stat-grid,
+  .admin-image-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .admin-gallery-editor {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 920px) {
+  .admin-dashboard {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-sidebar {
+    min-height: auto;
+    position: static;
+  }
+
+  .admin-nav {
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(132px, 1fr);
+    overflow-x: auto;
+  }
+
+  .admin-workspace {
+    padding: 18px;
+  }
+
+  .admin-topbar,
+  .admin-section-heading,
+  .admin-list-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .admin-topbar-actions,
+  .admin-inline-actions {
+    width: 100%;
+  }
+
+  .admin-topbar-actions > *,
+  .admin-inline-actions > * {
+    flex: 1;
+  }
+
+  .admin-form-grid,
+  .admin-rooms-layout,
+  .admin-feature-editor,
+  .admin-gallery-item {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-room-list {
+    position: static;
+  }
+
+  .admin-image-picker__controls {
+    grid-column: 1 / -1;
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 560px) {
+  .admin-auth {
+    padding: 14px;
+  }
+
+  .admin-auth-card {
+    padding: 24px;
+  }
+
+  .admin-workspace {
+    padding: 14px;
+  }
+
+  .admin-stat-grid,
+  .admin-image-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-topbar h1 {
+    font-size: 30px;
+  }
+
+  .admin-section-heading h2 {
+    font-size: 23px;
+  }
+
+  .admin-image-picker,
+  .admin-media-row,
+  .admin-string-row {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-icon-button {
+    width: 100%;
+  }
+}
+
+.booking-form--request {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.booking-form--request .booking-form__button {
+  grid-column: span 2;
+  width: 100%;
+}
+
+.booking-form__note {
+  grid-column: span 2;
+  min-width: 0;
+}
+
+.booking-form__summary {
+  align-content: center;
+  background: rgba(255, 254, 249, 0.82);
+  border: 1px solid rgba(201, 160, 96, 0.34);
+  border-radius: 8px;
+  display: grid;
+  gap: 4px;
+  grid-column: span 2;
+  min-height: 66px;
+  min-width: 0;
+  padding: 12px 14px;
+}
+
+.booking-form__summary strong,
+.booking-form__summary span {
+  min-width: 0;
+}
+
+.booking-form__summary strong {
+  color: var(--green-dark);
+  font-size: 16px;
+  line-height: 1.2;
+}
+
+.booking-form__summary span {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.booking-form__summary--warning {
+  background: #fff4f1;
+  border-color: #e3b8ae;
+}
+
+.booking-form__summary--warning strong {
+  color: #a44335;
+}
+
+.booking-form__honeypot {
+  height: 1px;
+  left: -10000px;
+  overflow: hidden;
+  position: absolute;
+  top: auto;
+  width: 1px;
+}
+
+.booking-form__message {
+  border-radius: 6px;
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: 12px 14px;
+  text-align: left;
+}
+
+.booking-form .booking-form__message {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.booking-form__message--success {
+  background: #edf7ef;
+  border: 1px solid #b8d8bc;
+  color: #1f6232 !important;
+}
+
+.booking-form__message--error {
+  background: #fff4f1;
+  border: 1px solid #e3b8ae;
+  color: #a44335 !important;
+}
+
+.admin-stat-grid {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
+.admin-empty-state {
+  background: var(--admin-panel-soft);
+  border: 1px dashed var(--admin-line);
+  border-radius: 8px;
+  color: var(--admin-muted);
+  font-size: 14px;
+  padding: 28px;
+  text-align: center;
+}
+
+.admin-reservation-board {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.admin-reservation-create {
+  background: var(--admin-panel-soft);
+  border: 1px solid var(--admin-line);
+  border-radius: 8px;
+  display: grid;
+  gap: 16px;
+  margin-bottom: 18px;
+  padding: 16px;
+}
+
+.admin-list-heading h3 {
+  color: var(--admin-ink);
+  font-family: var(--font-heading), Georgia, serif;
+  font-size: 24px;
+  font-weight: 400;
+  margin: 0;
+}
+
+.admin-list-heading span {
+  color: var(--admin-muted);
+  font-size: 12px;
+}
+
+.admin-reservation-card {
+  background: var(--admin-panel-soft);
+  border: 1px solid var(--admin-line);
+  border-left: 5px solid var(--admin-gold);
+  border-radius: 8px;
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+  padding: 16px;
+}
+
+.admin-reservation-card--confirmed {
+  border-left-color: #2f8f4e;
+}
+
+.admin-reservation-card--cancelled {
+  border-left-color: var(--admin-red);
+}
+
+.admin-reservation-card--contacted {
+  border-left-color: var(--admin-blue);
+}
+
+.admin-reservation-card__top {
+  align-items: flex-start;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.admin-reservation-card__top strong,
+.admin-reservation-card__top span,
+.admin-reservation-card__top small {
+  display: block;
+}
+
+.admin-reservation-card__top strong {
+  font-size: 17px;
+}
+
+.admin-reservation-card__top span,
+.admin-reservation-card__top small,
+.admin-reservation-meta span {
+  color: var(--admin-muted);
+  font-size: 12px;
+}
+
+.admin-reservation-card__top small {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.admin-reservation-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.admin-reservation-meta span {
+  background: var(--admin-panel);
+  border: 1px solid var(--admin-line);
+  border-radius: 999px;
+  padding: 6px 9px;
+}
+
+.admin-reservation-note {
+  color: var(--admin-ink);
+  font-size: 14px;
+  line-height: 1.55;
+  margin: 0;
+}
+
+.admin-reservation-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.admin-form-grid--compact,
+.admin-form-grid--reservation {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.admin-form-grid--compact .admin-field--wide,
+.admin-form-grid--reservation .admin-field--wide {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 1180px) {
+  .booking-form--request {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .admin-stat-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 920px) {
+  .admin-reservation-board {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 760px) {
+  .booking-form--request {
+    grid-template-columns: 1fr;
+  }
+
+  .booking-form--request .booking-form__button,
+  .booking-form__note,
+  .booking-form__summary {
+    grid-column: auto;
+  }
+
+  .booking-form__message {
+    text-align: center;
+  }
+}
+
+@media (max-width: 560px) {
+  .admin-stat-grid,
+  .admin-form-grid--compact,
+  .admin-form-grid--reservation {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-reservation-card__top {
+    display: grid;
+  }
+
+  .admin-reservation-card__top small {
+    text-align: left;
+    white-space: normal;
+  }
+}
+
+.gallery-grid {
+  grid-auto-rows: 260px;
+}
+
+.gallery-grid .visual-panel {
+  min-height: 260px;
+}
+
+.gallery-grid__button {
+  appearance: none;
+  cursor: zoom-in;
+  display: block;
+  width: 100%;
+  padding: 0;
+  text-align: inherit;
+}
+
+.gallery-grid__button img {
+  object-fit: cover;
+  transition: transform 0.32s ease;
+}
+
+.gallery-grid__button:hover img,
+.gallery-grid__button:focus-visible img {
+  transform: scale(1.035);
+}
+
+body.lightbox-open {
+  overflow: hidden;
+}
+
+.gallery-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: grid;
+  place-items: center;
+  padding: clamp(18px, 3vw, 44px);
+}
+
+.gallery-lightbox__backdrop {
+  position: absolute;
+  inset: 0;
+  cursor: zoom-out;
+  background: rgba(6, 15, 21, 0.9);
+  backdrop-filter: blur(18px);
+}
+
+.gallery-lightbox__stage {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr) 54px;
+  grid-template-rows: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  width: min(1480px, 100%);
+  height: min(86svh, 920px);
+}
+
+.gallery-lightbox__image-frame {
+  position: relative;
+  grid-column: 2;
+  min-width: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.gallery-lightbox__image-frame img {
+  object-fit: contain;
+}
+
+.gallery-lightbox__caption {
+  grid-column: 2;
+  color: #ffffffd9;
+  margin: 0;
+  text-align: center;
+  font-size: 14px;
+}
+
+.gallery-lightbox__control {
+  position: relative;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 54px;
+  height: 54px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  cursor: pointer;
+  font-size: 34px;
+  line-height: 1;
+  transition: background 0.18s ease, transform 0.18s ease;
+}
+
+.gallery-lightbox__control:hover,
+.gallery-lightbox__control:focus-visible {
+  background: rgba(255, 255, 255, 0.22);
+  transform: translateY(-1px);
+}
+
+.gallery-lightbox__control--previous {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.gallery-lightbox__control--next {
+  grid-column: 3;
+  grid-row: 1;
+}
+
+.gallery-lightbox__control--close {
+  position: absolute;
+  top: 0;
+  right: 0;
+  font-size: 32px;
+}
+
+@media (max-width: 760px) {
+  .gallery-grid {
+    grid-auto-rows: 300px;
+  }
+
+  .gallery-grid .visual-panel,
+  .gallery-grid .visual-panel:first-child {
+    grid-area: auto;
+    min-height: 300px;
+  }
+
+  .gallery-lightbox {
+    padding: 14px;
+  }
+
+  .gallery-lightbox__stage {
+    grid-template-columns: 44px minmax(0, 1fr) 44px;
+    grid-template-rows: minmax(0, 1fr) auto;
+    gap: 10px;
+    height: 82svh;
+  }
+
+  .gallery-lightbox__control {
+    width: 44px;
+    height: 44px;
+    font-size: 28px;
+  }
+
+  .gallery-lightbox__control--close {
+    top: -4px;
+    right: -4px;
+  }
+
+  .gallery-lightbox__caption {
+    font-size: 12px;
+  }
+
 }

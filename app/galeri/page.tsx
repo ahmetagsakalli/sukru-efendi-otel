@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
+import { GalleryLightbox } from "@/components/GalleryLightbox";
 import { PageIntro } from "@/components/PageIntro";
-import { VisualImage } from "@/components/VisualImage";
-import { galleryItems } from "@/data/site";
+import { getSiteContent } from "@/lib/site-content";
 
 export const metadata: Metadata = {
   title: "Galeri",
@@ -13,28 +13,17 @@ export const metadata: Metadata = {
     title: "Galeri | Şükrü Efendi Ottoman Hotel",
     description: "Şükrü Efendi Ottoman Hotel dış cephe, resepsiyon, oda ve detay fotoğrafları.",
     url: "/galeri",
-    images: ["/hotel-images/hero-facade-night.jpg"]
+    images: ["/hotel-images/hero-facade-night.webp"]
   }
 };
 
-export default function GalleryPage() {
+export default async function GalleryPage() {
+  const { galleryItems, pages } = await getSiteContent();
+
   return (
     <div className="page-transition">
-      <PageIntro title="Otelin dokusunu taşıyan kareler.">
-        Dış cepheden resepsiyona, oda detaylarından ortak alanlara kadar otelin atmosferini gösteren
-        seçilmiş fotoğraflar.
-      </PageIntro>
-      <section className="section gallery-grid">
-        {galleryItems.map((item) => (
-          <VisualImage
-            key={item.image}
-            className={`visual-panel visual-panel--${item.tone}`}
-            src={item.image}
-            alt={item.title}
-            sizes="(max-width: 760px) 100vw, (max-width: 1100px) 50vw, 33vw"
-          />
-        ))}
-      </section>
+      <PageIntro title={pages.gallery.title}>{pages.gallery.body}</PageIntro>
+      <GalleryLightbox items={galleryItems} />
     </div>
   );
 }

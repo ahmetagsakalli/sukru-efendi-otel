@@ -7,30 +7,31 @@ import { RoomCard } from "@/components/RoomCard";
 import { RoomStats } from "@/components/RoomStats";
 import { StructuredData } from "@/components/StructuredData";
 import { VisualImage } from "@/components/VisualImage";
-import { rooms, services } from "@/data/site";
+import { getSiteContent } from "@/lib/site-content";
 
-export default function HomePage() {
+export default async function HomePage() {
+  const content = await getSiteContent();
+  const { pages, rooms, services } = content;
+
   return (
     <div className="page-transition">
-      <StructuredData />
+      <StructuredData content={content} />
       <section className="hero-shell">
         <VisualImage
           className="visual-panel visual-panel--hero"
-          src="/hotel-images/hero-facade-night.jpg"
-          alt="Şükrü Efendi Ottoman Hotel"
+          src={pages.home.heroImage}
+          alt={content.site.name}
           priority
         />
         <div className="hero-content">
           <div className="hero-copy">
             <h1>
-              ŞEHRİN KALBİNDE
+              {pages.home.heroTitle}
               <br />
-              <em>LÜKS KONAKLAMA</em>
+              <em>{pages.home.heroEmphasis}</em>
             </h1>
             <HeroServiceRotator items={services} />
-            <p className="hero-lead">
-              400 yıllık tarihi bir yapıda, şehrin merkezinde sakin ve özenli bir otel deneyimi.
-            </p>
+            <p className="hero-lead">{pages.home.heroLead}</p>
             <div className="hero-actions">
               <Link className="booking-link booking-link--glass" href="#odalar">
                 ODALARI KEŞFET
@@ -39,13 +40,13 @@ export default function HomePage() {
           </div>
         </div>
       </section>
-      <BookingForm />
+      <BookingForm rooms={rooms} />
       <section className="section rooms-section" id="odalar">
         <div className="section-title">
           <h2>Odalar ve Suitler</h2>
         </div>
-        <RoomStats />
-        <FeatureHighlights />
+        <RoomStats rooms={rooms} />
+        <FeatureHighlights features={content.roomFeatures} />
         <div className="room-grid">
           {rooms.map((room) => (
             <RoomCard room={room} key={room.slug} />
@@ -55,23 +56,19 @@ export default function HomePage() {
       <section className="section history-preview">
         <VisualImage
           className="visual-panel visual-panel--facade"
-          src="/hotel-images/facade-night-wide.jpg"
+          src={pages.home.historyImage}
           alt="Tarihi doku"
           sizes="(max-width: 760px) 100vw, (max-width: 1100px) 50vw, 33vw"
         />
         <div>
-          <h2>Yeni bir bina hissi değil, korunmuş bir zaman duygusu.</h2>
-          <p>
-            Şükrü Efendi Ottoman Hotel&apos;in karakteri, içinde bulunduğu tarihi yapının sakin
-            tavrından gelir. Konaklama, şehir merkezine yakın ama kendi içinde dingin bir alanda
-            gerçekleşir.
-          </p>
+          <h2>{pages.home.historyTitle}</h2>
+          <p>{pages.home.historyText}</p>
           <Link className="text-link" href="/tarihce">
             Hikayeyi Oku
           </Link>
         </div>
       </section>
-      <GalleryStrip />
+      <GalleryStrip items={content.galleryItems} />
     </div>
   );
 }
