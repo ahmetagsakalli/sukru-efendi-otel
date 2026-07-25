@@ -11,6 +11,7 @@ import {
   Clock3,
   ClipboardList,
   Copy,
+  CreditCard,
   FileText,
   GalleryHorizontal,
   Hotel,
@@ -44,6 +45,7 @@ type AdminTab =
   | "dashboard"
   | "rooms"
   | "reservations"
+  | "payments"
   | "guests"
   | "inbox"
   | "history"
@@ -81,17 +83,18 @@ type GuestProfile = {
 };
 
 const tabs: Array<{ id: AdminTab; label: string; icon: ReactNode }> = [
-  { id: "dashboard", label: "Dashboard", icon: <ClipboardList size={18} /> },
-  { id: "rooms", label: "Rooms", icon: <BedDouble size={18} /> },
-  { id: "reservations", label: "Reservations", icon: <CalendarCheck size={18} /> },
-  { id: "guests", label: "Guests", icon: <Users size={18} /> },
-  { id: "inbox", label: "Inbox", icon: <Inbox size={18} /> },
-  { id: "history", label: "History", icon: <Clock3 size={18} /> },
-  { id: "content", label: "Site Content", icon: <FileText size={18} /> },
-  { id: "gallery", label: "Gallery", icon: <GalleryHorizontal size={18} /> },
-  { id: "services", label: "Services", icon: <ListChecks size={18} /> },
-  { id: "images", label: "Media", icon: <ImageIcon size={18} /> },
-  { id: "settings", label: "Settings", icon: <Settings size={18} /> }
+  { id: "dashboard", label: "Panel", icon: <ClipboardList size={18} /> },
+  { id: "rooms", label: "Odalar", icon: <BedDouble size={18} /> },
+  { id: "reservations", label: "Rezervasyonlar", icon: <CalendarCheck size={18} /> },
+  { id: "payments", label: "Ödemeler", icon: <CreditCard size={18} /> },
+  { id: "guests", label: "Misafirler", icon: <Users size={18} /> },
+  { id: "inbox", label: "Gelen Kutusu", icon: <Inbox size={18} /> },
+  { id: "history", label: "Hareketler", icon: <Clock3 size={18} /> },
+  { id: "content", label: "Site İçeriği", icon: <FileText size={18} /> },
+  { id: "gallery", label: "Galeri", icon: <GalleryHorizontal size={18} /> },
+  { id: "services", label: "Hizmetler", icon: <ListChecks size={18} /> },
+  { id: "images", label: "Medya", icon: <ImageIcon size={18} /> },
+  { id: "settings", label: "Ayarlar", icon: <Settings size={18} /> }
 ];
 
 function replaceItem<T>(items: T[], index: number, item: T) {
@@ -368,6 +371,9 @@ export function AdminDashboard({ initialContent, initialImages, initialReservati
   const [roomSearch, setRoomSearch] = useState("");
   const [reservationSearch, setReservationSearch] = useState("");
   const [reservationStatusFilter, setReservationStatusFilter] = useState<"all" | ReservationStatus>("all");
+  const [paymentSearch, setPaymentSearch] = useState("");
+  const [paymentStatusFilter, setPaymentStatusFilter] = useState<"all" | PaymentStatus>("all");
+  const [paymentNotes, setPaymentNotes] = useState<Record<string, string>>({});
   const [guestSearch, setGuestSearch] = useState("");
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState<"success" | "error">("success");
@@ -377,6 +383,7 @@ export function AdminDashboard({ initialContent, initialImages, initialReservati
   const [isCreatingReservation, setIsCreatingReservation] = useState(false);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [updatingReservationId, setUpdatingReservationId] = useState<string | null>(null);
+  const [updatingPaymentId, setUpdatingPaymentId] = useState<string | null>(null);
   const [passwordForm, setPasswordForm] = useState({
     currentPassword: "",
     newPassword: "",
@@ -400,6 +407,9 @@ export function AdminDashboard({ initialContent, initialImages, initialReservati
     const confirmedReservations = reservations.filter((reservation) => reservation.status === "confirmed");
     const cancelledReservations = reservations.filter((reservation) => reservation.status === "cancelled");
     const confirmedRevenue = confirmedReservations.reduce((sum, reservation) => sum + reservation.estimatedTotal, 0);
+    const paidRevenue = reservations
+      .filter((reservation) => reservation.paymentStatus === "paid")
+      .reduce((sum, reservation) => sum + (reservation.paymentAmount || reservation.estimatedTotal), 0);
     const totalRoomInventory = content.rooms.reduce((sum, room) => sum + room.count, 0);
     const bookedRoomNights = confirmedReservations.reduce((sum, reservation) => sum + reservation.nights, 0);
     const averageStay = confirmedReservations.length ? Math.round(bookedRoomNights / confirmedReservations.length) : 0;
@@ -410,7 +420,11 @@ export function AdminDashboard({ initialContent, initialImages, initialReservati
       cancelledReservations: cancelledReservations.length,
       confirmedReservations: confirmedReservations.length,
       confirmedRevenue,
+      failedPayments: reservations.filter((reservation) => reservation.paymentStatus === "failed").length,
       newRequests: reservations.filter((reservation) => reservation.status === "new").length,
+      paidPayments: reservations.filter((reservation) => reservation.paymentStatus === "paid").length,
+      paidRevenue,
+      pendingPayments: reservations.filter((reservation) => ["pending", "processing"].includes(reservation.paymentStatus)).length,
       totalRoomInventory
     };
   }, [content.rooms, reservations]);
@@ -420,7 +434,8 @@ export function AdminDashboard({ initialContent, initialImages, initialReservati
       { label: "Yeni talep", value: dashboardMetrics.newRequests },
       { label: "Onaylı", value: dashboardMetrics.confirmedReservations },
       { label: "Tahmini gelir", value: formatBookingCurrency(dashboardMetrics.confirmedRevenue) },
-      { label: "Oda tipi", value: content.rooms.length },
+      { label: "Ödenen", value: formatBookingCurrency(dashboardMetrics.paidRevenue) },
+      { label: "Ödeme bekleyen", value: dashboardMetrics.pendingPayments },
       { label: "Misafir", value: guestProfiles.length }
     ];
   }, [content.rooms.length, dashboardMetrics, guestProfiles.length]);
@@ -680,7 +695,7 @@ export function AdminDashboard({ initialContent, initialImages, initialReservati
         newPassword: "",
         confirmPassword: ""
       });
-      flash("success", "Admin şifresi değiştirildi.");
+      flash("success", "Panel şifresi değiştirildi.");
     } catch {
       flash("error", "Şifre değiştirilemedi. Bağlantıyı kontrol edip tekrar deneyin.");
     } finally {
@@ -778,6 +793,49 @@ export function AdminDashboard({ initialContent, initialImages, initialReservati
     const updated = constrainReservationGuests({ ...reservation, status }, content.rooms);
     setReservations((current) => current.map((item) => (item.id === id ? updated : item)));
     await submitReservationUpdate(updated);
+  }
+
+  async function updatePaymentStatus(
+    id: string,
+    action: "mark_paid" | "mark_failed" | "mark_cancelled" | "mark_refunded" | "clear_payment"
+  ) {
+    const reservation = reservations.find((item) => item.id === id);
+    if (!reservation) return;
+
+    setUpdatingPaymentId(id);
+    setMessage("");
+
+    try {
+      const response = await fetch("/api/admin/payments", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action,
+          amount: reservation.paymentAmount || reservation.estimatedTotal,
+          id,
+          note: paymentNotes[id] ?? ""
+        })
+      });
+      const result = (await response.json().catch(() => ({}))) as {
+        reservation?: ReservationRequest;
+        error?: string;
+      };
+
+      if (handleUnauthorized(response)) return;
+
+      if (!response.ok || !result.reservation) {
+        flash("error", result.error ?? "Ödeme durumu güncellenemedi.");
+        return;
+      }
+
+      setReservations((current) => current.map((item) => (item.id === id ? result.reservation! : item)));
+      setPaymentNotes((current) => ({ ...current, [id]: "" }));
+      flash("success", "Ödeme durumu güncellendi.");
+    } catch {
+      flash("error", "Ödeme durumu güncellenemedi. Bağlantıyı kontrol edin.");
+    } finally {
+      setUpdatingPaymentId(null);
+    }
   }
 
   function updateReservationLocal(id: string, patch: Partial<ReservationRequest>) {
@@ -963,7 +1021,7 @@ export function AdminDashboard({ initialContent, initialImages, initialReservati
       <div className="admin-section-stack">
         <section className="admin-dashboard-hero">
           <div>
-            <p className="admin-kicker">Booking Management System</p>
+            <p className="admin-kicker">Otel Yönetim Sistemi</p>
             <h2>{content.site.shortName} operasyon paneli</h2>
             <span>
               Odalar, fiyatlar, rezervasyon talepleri, misafirler ve site içeriği tek panelden yönetiliyor.
@@ -986,7 +1044,7 @@ export function AdminDashboard({ initialContent, initialImages, initialReservati
             <div className="admin-section-heading">
               <div>
                 <h2>Son rezervasyonlar</h2>
-                <span>Web ve admin kayıtları</span>
+                <span>Site ve panel kayıtları</span>
               </div>
               <button className="admin-secondary-button" type="button" onClick={() => setActiveTab("reservations")}>
                 Tümünü aç
@@ -1057,7 +1115,7 @@ export function AdminDashboard({ initialContent, initialImages, initialReservati
           <section className="admin-panel-section admin-dashboard-card">
             <div className="admin-section-heading">
               <div>
-                <h2>Inbox</h2>
+                <h2>Gelen Kutusu</h2>
                 <span>Yanıt bekleyen web talepleri</span>
               </div>
               <button className="admin-secondary-button" type="button" onClick={() => setActiveTab("inbox")}>
@@ -1082,7 +1140,7 @@ export function AdminDashboard({ initialContent, initialImages, initialReservati
                 <span>Son güncellemeler</span>
               </div>
               <button className="admin-secondary-button" type="button" onClick={() => setActiveTab("history")}>
-                History
+                Hareketler
               </button>
             </div>
             <div className="admin-activity-list">
@@ -1121,7 +1179,7 @@ export function AdminDashboard({ initialContent, initialImages, initialReservati
               onChange={(value) => updateSiteField("description", value)}
             />
             <TextField
-              label="Canonical URL"
+              label="Ana site adresi"
               value={content.site.canonicalUrl}
               onChange={(value) => updateSiteField("canonicalUrl", value)}
             />
@@ -1221,7 +1279,7 @@ export function AdminDashboard({ initialContent, initialImages, initialReservati
         <div className="admin-section-heading">
           <div>
             <h2>Rezervasyonlar</h2>
-            <span>{archivedCount > 0 ? `${archivedCount} arşivlenmiş kayıt var` : "Web sitesi ve manuel kayıtlar"}</span>
+            <span>{archivedCount > 0 ? `${archivedCount} arşivlenmiş kayıt var` : "Site ve manuel kayıtlar"}</span>
           </div>
           <button className="admin-secondary-button" type="button" onClick={refreshReservations}>
             <RefreshCw size={16} />
@@ -1303,7 +1361,7 @@ export function AdminDashboard({ initialContent, initialImages, initialReservati
             <TextField label="Telefon" type="tel" value={newReservation.phone} onChange={(value) => updateNewReservationField("phone", value)} />
             <TextField label="E-posta" type="email" value={newReservation.email} onChange={(value) => updateNewReservationField("email", value)} />
             <TextArea label="Misafir notu" value={newReservation.note} onChange={(value) => updateNewReservationField("note", value)} />
-            <TextArea label="Admin notu" value={newReservation.adminNote} onChange={(value) => updateNewReservationField("adminNote", value)} />
+            <TextArea label="Panel notu" value={newReservation.adminNote} onChange={(value) => updateNewReservationField("adminNote", value)} />
           </div>
           <ReservationAvailabilityPreview preview={newReservationPreview} />
           <button
@@ -1348,7 +1406,7 @@ export function AdminDashboard({ initialContent, initialImages, initialReservati
                   <span>
                     <PaymentBadge status={reservation.paymentStatus} />
                   </span>
-                  <span>{reservation.source === "admin" ? "Admin" : "Web"}</span>
+                  <span>{reservation.source === "admin" ? "Panel" : "Site"}</span>
                   <span>
                     {reservation.adults} yetişkin
                     {reservation.children > 0 ? `, ${reservation.children} çocuk` : ""}
@@ -1429,7 +1487,7 @@ export function AdminDashboard({ initialContent, initialImages, initialReservati
                     onChange={(value) => updateReservationLocal(reservation.id, { note: value })}
                   />
                   <TextArea
-                    label="Admin notu"
+                    label="Panel notu"
                     value={reservation.adminNote ?? ""}
                     onChange={(value) => updateReservationLocal(reservation.id, { adminNote: value })}
                   />
@@ -1451,6 +1509,199 @@ export function AdminDashboard({ initialContent, initialImages, initialReservati
     );
   }
 
+  function renderPayments() {
+    const normalizedSearch = paymentSearch.trim().toLocaleLowerCase("tr-TR");
+    const paymentRows = reservations
+      .filter((reservation) => reservation.status !== "archived")
+      .filter((reservation) => {
+        if (paymentStatusFilter !== "all" && reservation.paymentStatus !== paymentStatusFilter) return false;
+        if (!normalizedSearch) return true;
+
+        return [
+          reservation.name,
+          reservation.phone,
+          reservation.email,
+          reservation.roomTitle,
+          reservation.paymentProvider,
+          reservation.paymentReference,
+          paymentStatusLabels[reservation.paymentStatus]
+        ]
+          .join(" ")
+          .toLocaleLowerCase("tr-TR")
+          .includes(normalizedSearch);
+      })
+      .sort((a, b) => {
+        const order: Record<PaymentStatus, number> = {
+          processing: 0,
+          pending: 1,
+          failed: 2,
+          paid: 3,
+          refunded: 4,
+          cancelled: 5,
+          not_required: 6
+        };
+
+        return order[a.paymentStatus] - order[b.paymentStatus] || b.updatedAt.localeCompare(a.updatedAt);
+      });
+    const totalPaid = reservations
+      .filter((reservation) => reservation.paymentStatus === "paid")
+      .reduce((sum, reservation) => sum + (reservation.paymentAmount || reservation.estimatedTotal), 0);
+    const pendingCount = reservations.filter((reservation) => ["pending", "processing"].includes(reservation.paymentStatus)).length;
+    const failedCount = reservations.filter((reservation) => reservation.paymentStatus === "failed").length;
+    const refundableCount = reservations.filter((reservation) => reservation.paymentStatus === "paid").length;
+
+    return (
+      <section className="admin-panel-section" data-testid="admin-section-payments">
+        <div className="admin-section-heading">
+          <div>
+            <h2>Ödemeler</h2>
+            <span>Sanal POS, manuel ödeme, iade ve başarısız ödeme takibi</span>
+          </div>
+          <button className="admin-secondary-button" type="button" onClick={refreshReservations}>
+            <RefreshCw size={16} />
+            Yenile
+          </button>
+        </div>
+        <div className="admin-payment-metrics">
+          <div className="admin-payment-metric">
+            <span>Tahsil edilen</span>
+            <strong>{formatBookingCurrency(totalPaid)}</strong>
+          </div>
+          <div className="admin-payment-metric">
+            <span>Bekleyen ödeme</span>
+            <strong>{pendingCount}</strong>
+          </div>
+          <div className="admin-payment-metric">
+            <span>Başarısız ödeme</span>
+            <strong>{failedCount}</strong>
+          </div>
+          <div className="admin-payment-metric">
+            <span>İade kontrolü</span>
+            <strong>{refundableCount}</strong>
+          </div>
+        </div>
+        <div className="admin-toolbar">
+          <label className="admin-search-field">
+            <Search size={16} />
+            <input
+              aria-label="Ödemelerde ara"
+              placeholder="Misafir, telefon, referans veya oda ara"
+              type="search"
+              value={paymentSearch}
+              onChange={(event) => setPaymentSearch(event.target.value)}
+            />
+          </label>
+          <select
+            aria-label="Ödeme durumu filtresi"
+            className="admin-filter-select"
+            value={paymentStatusFilter}
+            onChange={(event) => setPaymentStatusFilter(event.target.value as "all" | PaymentStatus)}
+          >
+            <option value="all">Tüm ödeme kayıtları</option>
+            {Object.entries(paymentStatusLabels).map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </div>
+        {paymentRows.length ? (
+          <div className="admin-payment-board">
+            {paymentRows.map((reservation) => {
+              const amount = reservation.paymentAmount || reservation.estimatedTotal;
+              const isUpdating = updatingPaymentId === reservation.id;
+
+              return (
+                <article className="admin-payment-card" key={reservation.id}>
+                  <div className="admin-payment-card__top">
+                    <div>
+                      <strong>{reservation.name}</strong>
+                      <span>{reservation.roomTitle} · {formatDateLabel(reservation.checkIn)} - {formatDateLabel(reservation.checkOut)}</span>
+                    </div>
+                    <div className="admin-payment-card__badges">
+                      <PaymentBadge status={reservation.paymentStatus} />
+                      <StatusBadge status={reservation.status} />
+                    </div>
+                  </div>
+                  <div className="admin-payment-detail-grid">
+                    <div>
+                      <span>Tutar</span>
+                      <strong>{formatBookingCurrency(amount, reservation.paymentCurrency)}</strong>
+                    </div>
+                    <div>
+                      <span>Sağlayıcı</span>
+                      <strong>{reservation.paymentProvider === "manual" ? "Manuel" : reservation.paymentProvider.toUpperCase()}</strong>
+                    </div>
+                    <div>
+                      <span>Referans</span>
+                      <strong>{reservation.paymentReference || "-"}</strong>
+                    </div>
+                    <div>
+                      <span>Güncelleme</span>
+                      <strong>{formatDateTimeLabel(reservation.paymentUpdatedAt || reservation.updatedAt)}</strong>
+                    </div>
+                  </div>
+                  {reservation.paymentFailureReason ? (
+                    <p className="admin-payment-warning">{reservation.paymentFailureReason}</p>
+                  ) : null}
+                  <TextField
+                    label="Ödeme notu"
+                    value={paymentNotes[reservation.id] ?? ""}
+                    onChange={(value) => setPaymentNotes((current) => ({ ...current, [reservation.id]: value }))}
+                  />
+                  <div className="admin-inline-actions">
+                    <button
+                      className="admin-primary-button"
+                      disabled={isUpdating}
+                      type="button"
+                      onClick={() => updatePaymentStatus(reservation.id, "mark_paid")}
+                    >
+                      Ödendi işaretle
+                    </button>
+                    <button
+                      className="admin-secondary-button"
+                      disabled={isUpdating}
+                      type="button"
+                      onClick={() => updatePaymentStatus(reservation.id, "mark_failed")}
+                    >
+                      Başarısız
+                    </button>
+                    <button
+                      className="admin-secondary-button"
+                      disabled={isUpdating}
+                      type="button"
+                      onClick={() => updatePaymentStatus(reservation.id, "mark_cancelled")}
+                    >
+                      İptal
+                    </button>
+                    <button
+                      className="admin-secondary-button"
+                      disabled={isUpdating}
+                      type="button"
+                      onClick={() => updatePaymentStatus(reservation.id, "mark_refunded")}
+                    >
+                      İade
+                    </button>
+                    <button
+                      className="admin-danger-button"
+                      disabled={isUpdating}
+                      type="button"
+                      onClick={() => updatePaymentStatus(reservation.id, "clear_payment")}
+                    >
+                      Sıfırla
+                    </button>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="admin-empty-state">Bu filtreyle ödeme kaydı bulunamadı.</div>
+        )}
+      </section>
+    );
+  }
+
   function renderGuests() {
     const normalizedSearch = guestSearch.trim().toLocaleLowerCase("tr-TR");
     const filteredGuests = guestProfiles.filter((guest) => {
@@ -1465,7 +1716,7 @@ export function AdminDashboard({ initialContent, initialImages, initialReservati
       <section className="admin-panel-section" data-testid="admin-section-guests">
         <div className="admin-section-heading">
           <div>
-            <h2>Guests</h2>
+            <h2>Misafirler</h2>
             <span>Rezervasyonlardan oluşturulan misafir profilleri</span>
           </div>
           <button className="admin-secondary-button" type="button" onClick={() => setActiveTab("reservations")}>
@@ -1545,8 +1796,8 @@ export function AdminDashboard({ initialContent, initialImages, initialReservati
       <section className="admin-panel-section" data-testid="admin-section-inbox">
         <div className="admin-section-heading">
           <div>
-            <h2>Inbox</h2>
-            <span>Web sitesinden gelen yeni ve görüşülen talepler</span>
+            <h2>Gelen Kutusu</h2>
+            <span>Siteden gelen yeni ve görüşülen talepler</span>
           </div>
           <button className="admin-secondary-button" type="button" onClick={refreshReservations}>
             <RefreshCw size={16} />
@@ -1621,7 +1872,7 @@ export function AdminDashboard({ initialContent, initialImages, initialReservati
         <section className="admin-panel-section" data-testid="admin-section-history">
           <div className="admin-section-heading">
             <div>
-              <h2>History</h2>
+              <h2>Hareketler</h2>
               <span>Rezervasyon hareketleri ve içerik tarihçesi</span>
             </div>
           </div>
@@ -2075,7 +2326,7 @@ export function AdminDashboard({ initialContent, initialImages, initialReservati
           <div className="admin-section-heading">
             <div>
               <h2>Güvenlik</h2>
-              <span>Admin panel şifresi</span>
+              <span>Yönetim paneli şifresi</span>
             </div>
             <KeyRound size={22} />
           </div>
@@ -2317,11 +2568,11 @@ export function AdminDashboard({ initialContent, initialImages, initialReservati
           <span>ŞE</span>
           <div>
             <strong>Şükrü Efendi</strong>
-            <small>Booking Admin</small>
+            <small>Yönetim Paneli</small>
           </div>
         </div>
-        <p className="admin-nav-label">Pages</p>
-        <nav className="admin-nav" aria-label="Admin menü">
+        <p className="admin-nav-label">Menü</p>
+        <nav className="admin-nav" aria-label="Yönetim menüsü">
           {tabs.map((tab) => (
             <button
               className={activeTab === tab.id ? "is-active" : ""}
@@ -2339,7 +2590,7 @@ export function AdminDashboard({ initialContent, initialImages, initialReservati
       <section className="admin-workspace">
         <header className="admin-topbar">
           <div>
-            <p className="admin-kicker">Admin Panel</p>
+            <p className="admin-kicker">Yönetim Paneli</p>
             <h1>{tabs.find((tab) => tab.id === activeTab)?.label}</h1>
           </div>
           <div className="admin-topbar-actions">
@@ -2371,6 +2622,7 @@ export function AdminDashboard({ initialContent, initialImages, initialReservati
         {activeTab === "dashboard" ? renderDashboard() : null}
         {activeTab === "rooms" ? renderRooms() : null}
         {activeTab === "reservations" ? renderReservations() : null}
+        {activeTab === "payments" ? renderPayments() : null}
         {activeTab === "guests" ? renderGuests() : null}
         {activeTab === "inbox" ? renderInbox() : null}
         {activeTab === "history" ? renderHistory() : null}

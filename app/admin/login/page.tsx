@@ -4,7 +4,7 @@ import { AdminAuthScreen } from "@/components/admin/AdminAuthScreen";
 import { getAdminAuthState, hasAdminSession } from "@/lib/admin-auth";
 
 export const metadata: Metadata = {
-  title: "Admin Giriş",
+  title: "Yönetim Paneli Giriş",
   robots: {
     index: false,
     follow: false

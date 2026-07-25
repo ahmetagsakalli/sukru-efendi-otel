@@ -34,6 +34,10 @@ function pnpmCommand() {
   return process.platform === "win32" ? "pnpm.cmd" : "pnpm";
 }
 
+function smokeClientHeaders(iteration, step) {
+  return { "x-forwarded-for": `10.72.${iteration}.${step}` };
+}
+
 async function pathExists(filePath) {
   try {
     await fs.access(filePath);
@@ -193,7 +197,8 @@ async function uploadWithPickerRoot(page, root, filePath) {
     root.locator("input[type='file']").setInputFiles(filePath)
   ]);
 
-  expect(response.ok(), `Upload failed with ${response.status()}`).toBeTruthy();
+  const responseBody = response.ok() ? "" : await response.text().catch(() => "");
+  expect(response.ok(), `Upload failed with ${response.status()}: ${responseBody.slice(0, 240)}`).toBeTruthy();
   const json = await response.json();
   assert(json.image?.src, "Upload response did not include image src.");
   uploadedPublicPaths.add(json.image.src);
@@ -220,7 +225,7 @@ async function uploadToLibrary(page, filePath) {
 async function loginOrSetup(page, password = adminPassword) {
   await page.goto(`${baseURL}/admin/login`);
 
-  const setupHeading = page.getByRole("heading", { name: "Admin parolası oluştur" });
+  const setupHeading = page.getByRole("heading", { name: "Panel parolası oluştur" });
 
   if (await setupHeading.isVisible().catch(() => false)) {
     await page.getByLabel("Parola", { exact: true }).fill(password);
@@ -236,6 +241,7 @@ async function loginOrSetup(page, password = adminPassword) {
 
 async function createReservation(page, iteration) {
   const response = await page.request.post(`${baseURL}/api/reservations`, {
+    headers: smokeClientHeaders(iteration, 20),
     data: {
       checkIn: "2026-08-01",
       checkOut: "2026-08-03",
@@ -256,7 +262,7 @@ async function createReservation(page, iteration) {
   assert(json.reservation?.estimatedTotal > 0, "Reservation response did not include a calculated total.");
 }
 
-async function checkPublicReservationValidation(page) {
+async function checkPublicReservationValidation(page, iteration) {
   const availability = await page.request.get(`${baseURL}/api/availability?checkIn=2026-08-01&checkOut=2026-08-03&roomSlug=suit-oda`);
   expect(availability.ok(), `Availability request failed with ${availability.status()}`).toBeTruthy();
   const availabilityJson = await availability.json();
@@ -264,6 +270,7 @@ async function checkPublicReservationValidation(page) {
   assert(availabilityJson.rooms?.[0]?.estimatedTotal > 0, "Availability response did not include a calculated total.");
 
   const invalidDate = await page.request.post(`${baseURL}/api/reservations`, {
+    headers: smokeClientHeaders(iteration, 1),
     data: {
       checkIn: "2026-08-03",
       checkOut: "2026-08-01",
@@ -281,6 +288,7 @@ async function checkPublicReservationValidation(page) {
   expect(invalidDate.status()).toBe(400);
 
   const invalidEmail = await page.request.post(`${baseURL}/api/reservations`, {
+    headers: smokeClientHeaders(iteration, 2),
     data: {
       checkIn: "2026-08-01",
       checkOut: "2026-08-03",
@@ -300,6 +308,7 @@ async function checkPublicReservationValidation(page) {
   expect(invalidEmailJson.issues?.[0]?.message).toBe("E-posta adresi geçersiz.");
 
   const overCapacity = await page.request.post(`${baseURL}/api/reservations`, {
+    headers: smokeClientHeaders(iteration, 3),
     data: {
       checkIn: "2026-08-01",
       checkOut: "2026-08-03",
@@ -319,6 +328,7 @@ async function checkPublicReservationValidation(page) {
   expect(overCapacityJson.error).toContain("en fazla 3 misafir");
 
   const honeypot = await page.request.post(`${baseURL}/api/reservations`, {
+    headers: smokeClientHeaders(iteration, 4),
     data: {
       checkIn: "2026-08-01",
       checkOut: "2026-08-03",
@@ -338,13 +348,14 @@ async function checkPublicReservationValidation(page) {
 
 async function checkPaymentInfrastructure(page, iteration) {
   const reservationResponse = await page.request.post(`${baseURL}/api/reservations`, {
+    headers: smokeClientHeaders(iteration, 10),
     data: {
       checkIn: "2026-09-01",
       checkOut: "2026-09-03",
       roomSlug: "standart-oda",
       adults: 2,
       children: 0,
-      name: `Payment Smoke ${iteration}`,
+      name: `Ödeme Smoke ${iteration}`,
       phone: "+90 555 400 50 60",
       email: "payment-smoke@example.com",
       note: "",
@@ -385,7 +396,7 @@ async function checkPaymentInfrastructure(page, iteration) {
 
 async function checkOverview(page, imagePath, iteration) {
   await page.getByTestId("admin-tab-content").click();
-  await expect(page.getByRole("heading", { level: 1, name: "Site Content" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Site İçeriği" })).toBeVisible();
 
   const hotelInfo = page.getByTestId("admin-section-site");
   await hotelInfo.getByLabel("Otel adı").fill(`Smoke Otel ${iteration}`);
@@ -394,27 +405,52 @@ async function checkOverview(page, imagePath, iteration) {
   const hero = page.getByTestId("admin-section-home-hero");
   await hero.getByLabel("Başlık").fill(`Smoke Başlık ${iteration}`);
   await hero.getByLabel("Vurgu başlığı").fill("Panel Test");
-  await hero.getByLabel("Kısa metin").fill("Admin panel smoke test metni.");
+  await hero.getByLabel("Kısa metin").fill("Yönetim paneli smoke test metni.");
   await uploadWithPicker(page, "image-picker-home-hero", imagePath);
 }
 
 async function checkDashboardShell(page) {
   await page.goto(`${baseURL}/dashboard`);
   await expect(page.getByTestId("admin-dashboard")).toBeVisible();
-  await expect(page.getByRole("heading", { level: 1, name: "Dashboard" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Panel" })).toBeVisible();
+  await page.getByTestId("admin-tab-payments").click();
+  await expect(page.getByRole("heading", { level: 1, name: "Ödemeler" })).toBeVisible();
   await page.getByTestId("admin-tab-guests").click();
-  await expect(page.getByRole("heading", { level: 1, name: "Guests" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Misafirler" })).toBeVisible();
   await page.getByTestId("admin-tab-inbox").click();
-  await expect(page.getByRole("heading", { level: 1, name: "Inbox" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Gelen Kutusu" })).toBeVisible();
   await page.getByTestId("admin-tab-history").click();
-  await expect(page.getByRole("heading", { level: 1, name: "History" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Hareketler" })).toBeVisible();
   await page.getByTestId("admin-tab-dashboard").click();
+}
+
+async function checkPayments(page, iteration) {
+  await page.getByTestId("admin-tab-payments").click();
+  await expect(page.getByRole("heading", { level: 1, name: "Ödemeler" })).toBeVisible();
+
+  const section = page.getByTestId("admin-section-payments");
+  await expect(section).toBeVisible();
+  await section.getByLabel("Ödemelerde ara").fill(`Ödeme Smoke ${iteration}`);
+
+  const card = section.locator(".admin-payment-card").filter({ hasText: `Ödeme Smoke ${iteration}` }).first();
+  await expect(card).toBeVisible();
+  await card.getByLabel("Ödeme notu").fill(`Smoke ödeme notu ${iteration}`);
+
+  const [response] = await Promise.all([
+    page.waitForResponse((candidate) => candidate.url().endsWith("/api/admin/payments") && candidate.request().method() === "PATCH"),
+    card.getByRole("button", { name: "İade" }).click()
+  ]);
+
+  expect(response.ok(), `Payment status update failed with ${response.status()}`).toBeTruthy();
+  await expect(page.getByText("Ödeme durumu güncellendi.")).toBeVisible();
+  await expect(card.getByText("İade").first()).toBeVisible();
+  await section.getByLabel("Ödemelerde ara").fill("");
 }
 
 async function checkReservations(page, iteration) {
   await createReservation(page, iteration);
   await page.getByTestId("admin-tab-reservations").click();
-  await expect(page.getByRole("heading", { level: 1, name: "Reservations" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Rezervasyonlar" })).toBeVisible();
   await page.getByRole("button", { name: "Yenile" }).click();
 
   const adminOverCapacity = await page.evaluate(async (payload) => {
@@ -449,7 +485,7 @@ async function checkReservations(page, iteration) {
   await expect(card).toBeVisible();
   await card.getByLabel("Durum").selectOption("confirmed");
   await card.getByLabel("Telefon").fill("+90 555 200 30 40");
-  await card.getByLabel("Admin notu").fill(`Smoke admin notu ${iteration}`);
+  await card.getByLabel("Panel notu").fill(`Smoke panel notu ${iteration}`);
 
   const [response] = await Promise.all([
     page.waitForResponse((candidate) => candidate.url().endsWith("/api/admin/reservations") && candidate.request().method() === "PATCH"),
@@ -475,6 +511,7 @@ async function checkReservations(page, iteration) {
   expect(blockerResponse.ok(), `Second confirmed reservation failed with ${blockerResponse.status()}`).toBeTruthy();
 
   const overbooked = await page.request.post(`${baseURL}/api/reservations`, {
+    headers: smokeClientHeaders(iteration, 21),
     data: {
       checkIn: "2026-08-01",
       checkOut: "2026-08-03",
@@ -509,7 +546,7 @@ async function checkReservations(page, iteration) {
 
 async function checkRooms(page) {
   await page.getByTestId("admin-tab-rooms").click();
-  await expect(page.getByRole("heading", { level: 1, name: "Rooms" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Odalar" })).toBeVisible();
   await page.getByLabel("Fiyat").fill("₺1.234");
   const roomGalleryPickers = page.locator("div[data-testid^='image-picker-room-gallery-']");
   const roomGalleryCountBeforeAdd = await roomGalleryPickers.count();
@@ -525,7 +562,7 @@ async function checkRooms(page) {
 
 async function checkGallery(page, imagePath) {
   await page.getByTestId("admin-tab-gallery").click();
-  await expect(page.getByRole("heading", { level: 1, name: "Gallery" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Galeri" })).toBeVisible();
   const galleryPickers = page.locator("div[data-testid^='image-picker-gallery-']");
   const pickerCountBeforeAdd = await galleryPickers.count();
   await page.getByRole("button", { name: "Görsel ekle" }).click();
@@ -542,7 +579,7 @@ async function checkGallery(page, imagePath) {
 
 async function checkServices(page) {
   await page.getByTestId("admin-tab-services").click();
-  await expect(page.getByRole("heading", { level: 1, name: "Services" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Hizmetler" })).toBeVisible();
   await page.getByRole("button", { name: "Hizmet ekle" }).click();
   await page.locator(".admin-string-row input").last().fill("Smoke Hizmet");
   await page.getByRole("button", { name: "Özellik ekle" }).click();
@@ -552,7 +589,7 @@ async function checkServices(page) {
 
 async function checkSettings(page, imagePath) {
   await page.getByTestId("admin-tab-settings").click();
-  await expect(page.getByRole("heading", { level: 1, name: "Settings" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Ayarlar" })).toBeVisible();
   const security = page.getByTestId("admin-section-security");
   await security.getByLabel("Mevcut şifre").fill(adminPassword);
   await security.getByLabel("Yeni şifre", { exact: true }).fill(changedAdminPassword);
@@ -564,7 +601,7 @@ async function checkSettings(page, imagePath) {
   ]);
 
   expect(passwordResponse.ok(), `Password change failed with ${passwordResponse.status()}`).toBeTruthy();
-  await expect(page.getByText("Admin şifresi değiştirildi.")).toBeVisible();
+  await expect(page.getByText("Panel şifresi değiştirildi.")).toBeVisible();
   await page.getByLabel("Telefon", { exact: true }).fill("+90 452 000 00 00");
   await page.getByLabel("WhatsApp", { exact: true }).fill("+90 555 000 00 00");
   await page.getByLabel("Tarihçe başlığı").fill("Smoke Tarihçe");
@@ -573,7 +610,7 @@ async function checkSettings(page, imagePath) {
 
 async function checkImages(page, imagePath, invalidImagePath) {
   await page.getByTestId("admin-tab-images").click();
-  await expect(page.getByRole("heading", { level: 1, name: "Media" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Medya" })).toBeVisible();
   const uploaded = await uploadToLibrary(page, imagePath);
   const uploadedTile = page.locator(".admin-image-tile").filter({ hasText: uploaded.name });
   await expect(uploadedTile.getByText("Kullanılmıyor")).toBeVisible();
@@ -673,10 +710,11 @@ async function runIteration(browser, iteration, imageA, imageB, invalidImage) {
   const unauthorized = await page.request.get(`${baseURL}/api/admin/content`);
   expect(unauthorized.status()).toBe(401);
   await checkSecurityHeaders(page);
-  await checkPublicReservationValidation(page);
+  await checkPublicReservationValidation(page, iteration);
   await checkPaymentInfrastructure(page, iteration);
   await loginOrSetup(page);
   await checkDashboardShell(page);
+  await checkPayments(page, iteration);
   await checkOverview(page, imageA, iteration);
   await checkReservations(page, iteration);
   await checkRooms(page);

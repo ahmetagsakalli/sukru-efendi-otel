@@ -88,7 +88,7 @@ export const adminCreateReservationSchema = z
       .regex(/^[+()0-9\s-]+$/, "Telefon numarası geçersiz."),
     email: emailValueSchema.default(""),
     note: storedTextSchema(700, "Not çok uzun."),
-    adminNote: storedTextSchema(700, "Admin notu çok uzun."),
+    adminNote: storedTextSchema(700, "Panel notu çok uzun."),
     status: reservationStatusSchema.default("confirmed")
   })
   .refine((value) => dateIsAfter(value.checkOut, value.checkIn), {
@@ -112,7 +112,7 @@ export const reservationRequestSchema = z.object({
   phone: z.string().trim().min(7).max(40),
   email: emailValueSchema.default(""),
   note: storedTextSchema(700, "Not çok uzun."),
-  adminNote: storedTextSchema(700, "Admin notu çok uzun."),
+  adminNote: storedTextSchema(700, "Panel notu çok uzun."),
   nights: z.number().int().min(1).max(90).default(1),
   pricePerNight: z.number().int().min(0).max(1_000_000).default(0),
   estimatedTotal: z.number().int().min(0).max(30_000_000).default(0),
@@ -147,7 +147,7 @@ export const updateReservationRequestSchema = z
       .regex(/^[+()0-9\s-]+$/, "Telefon numarası geçersiz."),
     email: emailValueSchema.default(""),
     note: storedTextSchema(700, "Not çok uzun."),
-    adminNote: storedTextSchema(700, "Admin notu çok uzun.")
+    adminNote: storedTextSchema(700, "Panel notu çok uzun.")
   })
   .refine((value) => dateIsAfter(value.checkOut, value.checkIn), {
     message: dateOrderMessage,

@@ -6,7 +6,7 @@ import { listReservationRequests } from "@/lib/reservations";
 import { getSiteContent, listPublicImages } from "@/lib/site-content";
 
 export const metadata: Metadata = {
-  title: "Dashboard",
+  title: "Yönetim Paneli",
   robots: {
     index: false,
     follow: false

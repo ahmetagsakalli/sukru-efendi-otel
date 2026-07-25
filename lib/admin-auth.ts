@@ -154,7 +154,7 @@ export async function createLocalAdminAuth(password: string) {
   const state = await getAdminAuthState();
 
   if (state.configured) {
-    return { ok: false as const, errors: ["Admin parolası zaten ayarlanmış."] };
+    return { ok: false as const, errors: ["Panel parolası zaten ayarlanmış."] };
   }
 
   if (!state.setupAllowed) {

@@ -23,9 +23,9 @@ export function AdminAuthScreen({ mode }: AdminAuthScreenProps) {
           <div className="admin-auth-icon">
             <LockKeyhole />
           </div>
-          <p className="admin-kicker">Şükrü Efendi Admin</p>
-          <h1>Admin yapılandırması gerekiyor</h1>
-          <p className="admin-auth-note">Production ortamında parola kurulumu env ayarı olmadan kapalı.</p>
+          <p className="admin-kicker">Şükrü Efendi Yönetim</p>
+          <h1>Yönetim paneli yapılandırması gerekiyor</h1>
+          <p className="admin-auth-note">Canlı ortamda parola kurulumu ortam değişkeni olmadan kapalı.</p>
         </div>
       </div>
     );
@@ -64,8 +64,8 @@ export function AdminAuthScreen({ mode }: AdminAuthScreenProps) {
     <div className="admin-auth">
       <form className="admin-auth-card" onSubmit={handleSubmit}>
         <div className="admin-auth-icon">{isSetup ? <ShieldCheck /> : <LockKeyhole />}</div>
-        <p className="admin-kicker">Şükrü Efendi Admin</p>
-        <h1>{isSetup ? "Admin parolası oluştur" : "Admin paneline giriş"}</h1>
+        <p className="admin-kicker">Şükrü Efendi Yönetim</p>
+        <h1>{isSetup ? "Panel parolası oluştur" : "Yönetim paneline giriş"}</h1>
         <label className="admin-field">
           <span>Parola</span>
           <input
