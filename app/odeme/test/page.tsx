@@ -42,7 +42,7 @@ export default function MockPaymentPage({
             </form>
           </div>
         ) : (
-          <Link className="booking-link booking-link--solid" href="/#rezervasyon">
+          <Link className="booking-link booking-link--solid" href="/rezervasyon">
             Rezervasyona dön
           </Link>
         )}

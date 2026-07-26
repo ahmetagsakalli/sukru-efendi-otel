@@ -30,6 +30,11 @@ const emailValueSchema = z
 const optionalTextSchema = (max: number, message: string) => z.string().trim().max(max, message).optional();
 const storedTextSchema = (max: number, message: string) => z.string().trim().max(max, message).default("");
 const dateOrderMessage = "Çıkış tarihi giriş tarihinden sonra olmalı.";
+const adminPricePerNightSchema = z.coerce
+  .number()
+  .int("Gecelik fiyat geçersiz.")
+  .min(0, "Gecelik fiyat negatif olamaz.")
+  .max(1_000_000, "Gecelik fiyat çok yüksek.");
 
 export const reservationSourceSchema = z.enum(["website", "admin"]);
 export const reservationStatusSchema = z.enum(["new", "contacted", "confirmed", "cancelled", "archived"]);
@@ -89,6 +94,7 @@ export const adminCreateReservationSchema = z
     email: emailValueSchema.default(""),
     note: storedTextSchema(700, "Not çok uzun."),
     adminNote: storedTextSchema(700, "Panel notu çok uzun."),
+    pricePerNight: adminPricePerNightSchema.optional(),
     status: reservationStatusSchema.default("confirmed")
   })
   .refine((value) => dateIsAfter(value.checkOut, value.checkIn), {
@@ -147,7 +153,8 @@ export const updateReservationRequestSchema = z
       .regex(/^[+()0-9\s-]+$/, "Telefon numarası geçersiz."),
     email: emailValueSchema.default(""),
     note: storedTextSchema(700, "Not çok uzun."),
-    adminNote: storedTextSchema(700, "Panel notu çok uzun.")
+    adminNote: storedTextSchema(700, "Panel notu çok uzun."),
+    pricePerNight: adminPricePerNightSchema.optional()
   })
   .refine((value) => dateIsAfter(value.checkOut, value.checkIn), {
     message: dateOrderMessage,

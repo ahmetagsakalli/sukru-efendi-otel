@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { ChangeEvent, ReactNode, useMemo, useState } from "react";
 import {
   ArrowDown,
+  ArrowLeft,
   ArrowUp,
   BedDouble,
   CalendarCheck,
@@ -21,6 +22,7 @@ import {
   ListChecks,
   LogOut,
   Mail,
+  Pencil,
   PhoneCall,
   Plus,
   RefreshCw,
@@ -31,7 +33,14 @@ import {
   Upload,
   Users
 } from "lucide-react";
-import { formatBookingCurrency, getGuestCount, getRoomAvailability, getRoomCapacityLimit } from "@/lib/booking";
+import {
+  calculateNights,
+  formatBookingCurrency,
+  getGuestCount,
+  getRoomAvailability,
+  getRoomCapacityLimit,
+  parseRoomPrice
+} from "@/lib/booking";
 import type { PaymentStatus, ReservationRequest, ReservationStatus } from "@/lib/reservation-schema";
 import type { AdminImage, GalleryItem, Room, RoomFeature, SiteContent } from "@/lib/site-content-schema";
 
@@ -66,8 +75,12 @@ type AdminReservationDraft = {
   email: string;
   note: string;
   adminNote: string;
+  pricePerNight: number;
   status: ReservationStatus;
 };
+
+type ReservationMode = "list" | "new" | "edit";
+type ReservationColumn = "guest" | "room" | "dates" | "guests" | "status" | "payment" | "total" | "source" | "actions";
 
 type GuestProfile = {
   key: string;
@@ -225,6 +238,30 @@ const paymentStatusLabels: Record<PaymentStatus, string> = {
   refunded: "İade"
 };
 
+const reservationColumnLabels: Record<ReservationColumn, string> = {
+  actions: "İşlem",
+  dates: "Tarih",
+  guest: "Misafir",
+  guests: "Kişi",
+  payment: "Ödeme",
+  room: "Oda",
+  source: "Kaynak",
+  status: "Durum",
+  total: "Tutar"
+};
+
+const defaultReservationColumns: Record<ReservationColumn, boolean> = {
+  actions: true,
+  dates: true,
+  guest: true,
+  guests: true,
+  payment: true,
+  room: true,
+  source: true,
+  status: true,
+  total: true
+};
+
 function getPaymentTone(status: PaymentStatus) {
   if (status === "paid") return "success";
   if (status === "failed" || status === "cancelled") return "danger";
@@ -276,13 +313,19 @@ function addDays(dateValue: string, days: number) {
   return formatDateOnly(date);
 }
 
+function getRoomPricePerNight(rooms: Room[], roomSlug: string) {
+  const room = rooms.find((item) => item.slug === roomSlug);
+  return room ? parseRoomPrice(room.price) : 0;
+}
+
 function createReservationDraft(rooms: Room[]): AdminReservationDraft {
   const checkIn = today();
+  const roomSlug = rooms[0]?.slug ?? "";
 
   return {
     checkIn,
     checkOut: addDays(checkIn, 1),
-    roomSlug: rooms[0]?.slug ?? "",
+    roomSlug,
     adults: 2,
     children: 0,
     name: "",
@@ -290,6 +333,7 @@ function createReservationDraft(rooms: Room[]): AdminReservationDraft {
     email: "",
     note: "",
     adminNote: "",
+    pricePerNight: getRoomPricePerNight(rooms, roomSlug),
     status: "confirmed"
   };
 }
@@ -297,7 +341,9 @@ function createReservationDraft(rooms: Room[]): AdminReservationDraft {
 type ReservationPreviewInput = Pick<
   AdminReservationDraft | ReservationRequest,
   "adults" | "checkIn" | "checkOut" | "children" | "roomSlug" | "status"
->;
+> & {
+  pricePerNight?: number;
+};
 
 function clampNumber(value: number, min: number, max: number) {
   if (!Number.isFinite(value)) return min;
@@ -315,6 +361,23 @@ function constrainReservationGuests<T extends { adults: number; children: number
   const adults = clampNumber(input.adults, 1, capacityLimit);
   const children = clampNumber(input.children, 0, Math.max(capacityLimit - adults, 0));
   return { ...input, adults, children };
+}
+
+function getReservationManualPricing(input: ReservationPreviewInput, rooms: Room[]) {
+  const nights = calculateNights(input.checkIn, input.checkOut);
+  const pricePerNight = Number.isFinite(input.pricePerNight)
+    ? Math.max(0, Math.round(input.pricePerNight ?? 0))
+    : getRoomPricePerNight(rooms, input.roomSlug);
+
+  return {
+    estimatedTotal: nights * pricePerNight,
+    nights,
+    pricePerNight
+  };
+}
+
+function reservationHasStarted(reservation: ReservationRequest) {
+  return reservation.status === "confirmed" && reservation.checkIn <= today();
 }
 
 function getReservationPreview({
@@ -336,6 +399,7 @@ function getReservationPreview({
       capacityLimit: 0,
       error: "Oda bulunamadı.",
       guestCount: getGuestCount(input.adults, input.children),
+      pricing: getReservationManualPricing(input, rooms),
       room: null
     };
   }
@@ -343,6 +407,7 @@ function getReservationPreview({
   const capacityLimit = getRoomCapacityLimit(room);
   const guestCount = getGuestCount(input.adults, input.children);
   const availability = getRoomAvailability(room, reservations, input.checkIn, input.checkOut, excludeReservationId);
+  const pricing = getReservationManualPricing(input, rooms);
   const dateError = !input.checkIn || !input.checkOut || input.checkOut <= input.checkIn ? "Çıkış tarihi girişten sonra olmalı." : "";
   const occupancyError =
     guestCount > capacityLimit ? `${room.title} için en fazla ${capacityLimit} misafir seçilebilir.` : "";
@@ -356,6 +421,7 @@ function getReservationPreview({
     capacityLimit,
     error: dateError || occupancyError || availabilityError,
     guestCount,
+    pricing,
     room
   };
 }
@@ -371,6 +437,9 @@ export function AdminDashboard({ initialContent, initialImages, initialReservati
   const [roomSearch, setRoomSearch] = useState("");
   const [reservationSearch, setReservationSearch] = useState("");
   const [reservationStatusFilter, setReservationStatusFilter] = useState<"all" | ReservationStatus>("all");
+  const [reservationMode, setReservationMode] = useState<ReservationMode>("list");
+  const [editingReservationId, setEditingReservationId] = useState<string | null>(null);
+  const [reservationColumns, setReservationColumns] = useState(defaultReservationColumns);
   const [paymentSearch, setPaymentSearch] = useState("");
   const [paymentStatusFilter, setPaymentStatusFilter] = useState<"all" | PaymentStatus>("all");
   const [paymentNotes, setPaymentNotes] = useState<Record<string, string>>({});
@@ -654,8 +723,47 @@ export function AdminDashboard({ initialContent, initialImages, initialReservati
         next.checkOut = addDays(value, 1);
       }
 
+      if (field === "roomSlug" && typeof value === "string") {
+        next.pricePerNight = getRoomPricePerNight(content.rooms, value);
+      }
+
       return constrainReservationGuests(next, content.rooms);
     });
+  }
+
+  function selectGuestForNewReservation(guestKey: string) {
+    const guest = guestProfiles.find((item) => item.key === guestKey);
+
+    if (!guest) return;
+
+    setNewReservation((current) => ({
+      ...current,
+      email: guest.email,
+      name: guest.name,
+      phone: guest.phone
+    }));
+  }
+
+  function openNewReservationForm() {
+    setEditingReservationId(null);
+    setReservationMode("new");
+  }
+
+  function openReservationEditor(id: string) {
+    setEditingReservationId(id);
+    setReservationMode("edit");
+  }
+
+  function closeReservationEditor() {
+    setEditingReservationId(null);
+    setReservationMode("list");
+  }
+
+  function toggleReservationColumn(column: ReservationColumn) {
+    setReservationColumns((current) => ({
+      ...current,
+      [column]: !current[column]
+    }));
   }
 
   function updatePasswordField(field: keyof typeof passwordForm, value: string) {
@@ -728,8 +836,10 @@ export function AdminDashboard({ initialContent, initialImages, initialReservati
         ...createReservationDraft(content.rooms),
         checkIn: current.checkIn,
         checkOut: current.checkOut,
+        pricePerNight: getRoomPricePerNight(content.rooms, current.roomSlug),
         roomSlug: current.roomSlug
       }));
+      setReservationMode("list");
       flash("success", "Rezervasyon oluşturuldu.");
     } catch {
       flash("error", "Rezervasyon oluşturulamadı. Bağlantıyı kontrol edin.");
@@ -753,6 +863,7 @@ export function AdminDashboard({ initialContent, initialImages, initialReservati
           email: reservation.email ?? "",
           name: reservation.name,
           note: reservation.note ?? "",
+          pricePerNight: reservation.pricePerNight,
           roomSlug: reservation.roomSlug,
           status: reservation.status,
           phone: reservation.phone,
@@ -772,6 +883,8 @@ export function AdminDashboard({ initialContent, initialImages, initialReservati
       }
 
       setReservations((current) => current.map((item) => (item.id === reservation.id ? result.reservation! : item)));
+      setReservationMode("list");
+      setEditingReservationId(null);
       flash("success", "Rezervasyon güncellendi.");
     } catch {
       flash("error", "Rezervasyon güncellenemedi. Bağlantıyı kontrol edin.");
@@ -840,9 +953,19 @@ export function AdminDashboard({ initialContent, initialImages, initialReservati
 
   function updateReservationLocal(id: string, patch: Partial<ReservationRequest>) {
     setReservations((current) =>
-      current.map((reservation) =>
-        reservation.id === id ? constrainReservationGuests({ ...reservation, ...patch }, content.rooms) : reservation
-      )
+      current.map((reservation) => {
+        if (reservation.id !== id) return reservation;
+
+        const selectedRoom = patch.roomSlug ? content.rooms.find((room) => room.slug === patch.roomSlug) : null;
+        const roomPatch = selectedRoom
+          ? {
+              pricePerNight: parseRoomPrice(selectedRoom.price),
+              roomTitle: selectedRoom.title
+            }
+          : {};
+
+        return constrainReservationGuests({ ...reservation, ...patch, ...roomPatch }, content.rooms);
+      })
     );
   }
 
@@ -1248,31 +1371,312 @@ export function AdminDashboard({ initialContent, initialImages, initialReservati
 
   function renderReservations() {
     const roomOptions = content.rooms.map((room) => [room.slug, room.title] as [string, string]);
-    const newReservationPreview = getReservationPreview({
-      input: newReservation,
-      reservations,
-      rooms: content.rooms
-    });
-    const newReservationMaxChildren = Math.max(newReservationPreview.capacityLimit - newReservation.adults, 0);
+    const guestOptions = [
+      ["", "Mevcut misafirden doldur"] as [string, string],
+      ...guestProfiles.map((guest) => [
+        guest.key,
+        `${guest.name} · ${guest.phone}${guest.email ? ` · ${guest.email}` : ""}`
+      ] as [string, string])
+    ];
     const normalizedSearch = reservationSearch.trim().toLocaleLowerCase("tr-TR");
-    const filteredReservations = reservations.filter((reservation) => {
-      if (reservationStatusFilter !== "all" && reservation.status !== reservationStatusFilter) return false;
-      if (!normalizedSearch) return reservation.status !== "archived";
+    const filteredReservations = reservations
+      .filter((reservation) => {
+        if (reservationStatusFilter !== "all" && reservation.status !== reservationStatusFilter) return false;
+        if (!normalizedSearch) return reservation.status !== "archived";
 
-      const haystack = [
-        reservation.name,
-        reservation.phone,
-        reservation.email,
-        reservation.roomTitle,
-        reservation.checkIn,
-        reservation.checkOut
-      ]
-        .join(" ")
-        .toLocaleLowerCase("tr-TR");
+        const haystack = [
+          reservation.name,
+          reservation.phone,
+          reservation.email,
+          reservation.roomTitle,
+          reservation.checkIn,
+          reservation.checkOut,
+          reservation.source,
+          reservationStatusLabels[reservation.status],
+          paymentStatusLabels[reservation.paymentStatus]
+        ]
+          .join(" ")
+          .toLocaleLowerCase("tr-TR");
 
-      return haystack.includes(normalizedSearch);
-    });
+        return haystack.includes(normalizedSearch);
+      })
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
     const archivedCount = reservations.length - activeReservations.length;
+    const editingReservation = editingReservationId
+      ? reservations.find((reservation) => reservation.id === editingReservationId) ?? null
+      : null;
+
+    function renderBlockedDates(roomSlug: string, excludeReservationId?: string) {
+      const blocks = reservations
+        .filter((reservation) => reservation.id !== excludeReservationId)
+        .filter((reservation) => reservation.roomSlug === roomSlug && reservation.status === "confirmed")
+        .sort((a, b) => a.checkIn.localeCompare(b.checkIn));
+
+      return (
+        <div className="admin-date-blocks">
+          <div>
+            <strong>Dolu dönemler</strong>
+            <span>Onaylı kayıtlar tarih seçimini etkiler</span>
+          </div>
+          {blocks.length ? (
+            <div className="admin-date-block-list">
+              {blocks.slice(0, 6).map((reservation) => (
+                <span key={reservation.id}>
+                  {formatDateLabel(reservation.checkIn)} - {formatDateLabel(reservation.checkOut)} · {reservation.name}
+                </span>
+              ))}
+              {blocks.length > 6 ? <em>+{blocks.length - 6} kayıt daha</em> : null}
+            </div>
+          ) : (
+            <small>Bu oda için onaylı blokaj yok.</small>
+          )}
+        </div>
+      );
+    }
+
+    function renderNewReservationForm() {
+      const newReservationPreview = getReservationPreview({
+        input: newReservation,
+        reservations,
+        rooms: content.rooms
+      });
+      const newReservationMaxChildren = Math.max(newReservationPreview.capacityLimit - newReservation.adults, 0);
+
+      return (
+        <div className="admin-reservation-module" data-testid="admin-create-reservation-form">
+          <div className="admin-module-heading">
+            <button className="admin-secondary-button" type="button" onClick={closeReservationEditor}>
+              <ArrowLeft size={16} />
+              Listeye dön
+            </button>
+            <div>
+              <p className="admin-kicker">Referans akış</p>
+              <h3>Yeni rezervasyon</h3>
+              <span>Misafir, oda, tarih, kişi sayısı, gecelik fiyat ve durum tek formda.</span>
+            </div>
+          </div>
+          <div className="admin-form-grid admin-form-grid--reservation">
+            <SelectField label="Misafir seç" value="" onChange={selectGuestForNewReservation} options={guestOptions} />
+            <SelectField
+              label="Oda"
+              value={newReservation.roomSlug}
+              onChange={(value) => updateNewReservationField("roomSlug", value)}
+              options={roomOptions}
+            />
+            <SelectField
+              label="Kayıt durumu"
+              value={newReservation.status}
+              onChange={(value) => updateNewReservationField("status", value as ReservationStatus)}
+              options={Object.entries(reservationStatusLabels)}
+            />
+            <DateField
+              label="Giriş"
+              min={today()}
+              value={newReservation.checkIn}
+              onChange={(value) => updateNewReservationField("checkIn", value)}
+            />
+            <DateField
+              label="Çıkış"
+              min={addDays(newReservation.checkIn, 1)}
+              value={newReservation.checkOut}
+              onChange={(value) => updateNewReservationField("checkOut", value)}
+            />
+            <NumberField
+              label="Gecelik fiyat"
+              min={0}
+              value={newReservation.pricePerNight}
+              onChange={(value) => updateNewReservationField("pricePerNight", value)}
+            />
+            <NumberField
+              label="Yetişkin"
+              min={1}
+              max={Math.max(newReservationPreview.capacityLimit, 1)}
+              value={newReservation.adults}
+              onChange={(value) => updateNewReservationField("adults", value)}
+            />
+            <NumberField
+              label="Çocuk"
+              min={0}
+              max={newReservationMaxChildren}
+              value={newReservation.children}
+              onChange={(value) => updateNewReservationField("children", value)}
+            />
+            <TextField label="Ad Soyad" value={newReservation.name} onChange={(value) => updateNewReservationField("name", value)} />
+            <TextField label="Telefon" type="tel" value={newReservation.phone} onChange={(value) => updateNewReservationField("phone", value)} />
+            <TextField label="E-posta" type="email" value={newReservation.email} onChange={(value) => updateNewReservationField("email", value)} />
+            <TextArea label="Misafir notu" value={newReservation.note} onChange={(value) => updateNewReservationField("note", value)} />
+            <TextArea label="Panel notu" value={newReservation.adminNote} onChange={(value) => updateNewReservationField("adminNote", value)} />
+          </div>
+          <div className="admin-reservation-form-side">
+            <ReservationAvailabilityPreview preview={newReservationPreview} />
+            {renderBlockedDates(newReservation.roomSlug)}
+          </div>
+          <div className="admin-inline-actions">
+            <button
+              className="admin-primary-button"
+              data-testid="admin-create-reservation"
+              disabled={isCreatingReservation || Boolean(newReservationPreview.error)}
+              type="button"
+              onClick={createReservation}
+            >
+              <Plus size={16} />
+              {isCreatingReservation ? "Oluşturuluyor" : "Rezervasyon Oluştur"}
+            </button>
+            <button className="admin-secondary-button" type="button" onClick={closeReservationEditor}>
+              Vazgeç
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    function renderEditReservationForm(reservation: ReservationRequest) {
+      const reservationPreview = getReservationPreview({
+        excludeReservationId: reservation.id,
+        input: reservation,
+        reservations,
+        rooms: content.rooms
+      });
+      const reservationMaxChildren = Math.max(reservationPreview.capacityLimit - reservation.adults, 0);
+      const lockStartedFields = reservationHasStarted(reservation);
+
+      return (
+        <div className="admin-reservation-module" data-testid="admin-edit-reservation-form">
+          <div className="admin-module-heading">
+            <button className="admin-secondary-button" type="button" onClick={closeReservationEditor}>
+              <ArrowLeft size={16} />
+              Listeye dön
+            </button>
+            <div>
+              <p className="admin-kicker">Rezervasyon #{reservation.id.slice(0, 8)}</p>
+              <h3>{reservation.name}</h3>
+              <span>
+                {reservation.source === "admin" ? "Panel kaydı" : "Web sitesi kaydı"} ·{" "}
+                {formatDateTimeLabel(reservation.createdAt)}
+              </span>
+            </div>
+          </div>
+          {lockStartedFields ? (
+            <p className="admin-reservation-lock-note">
+              Bu onaylı rezervasyon başlamış görünüyor. Oda ve tarih alanları korunur; durum, iletişim ve notlar güncellenebilir.
+            </p>
+          ) : null}
+          <div className="admin-form-grid admin-form-grid--reservation">
+            <TextField label="Ad Soyad" value={reservation.name} onChange={(value) => updateReservationLocal(reservation.id, { name: value })} />
+            <TextField label="Telefon" type="tel" value={reservation.phone} onChange={(value) => updateReservationLocal(reservation.id, { phone: value })} />
+            <TextField label="E-posta" type="email" value={reservation.email ?? ""} onChange={(value) => updateReservationLocal(reservation.id, { email: value })} />
+            <SelectField
+              disabled={lockStartedFields}
+              label="Oda"
+              value={reservation.roomSlug}
+              onChange={(value) => updateReservationLocal(reservation.id, { roomSlug: value })}
+              options={roomOptions}
+            />
+            <SelectField
+              label="Durum"
+              value={reservation.status}
+              onChange={(value) => updateReservationLocal(reservation.id, { status: value as ReservationStatus })}
+              options={Object.entries(reservationStatusLabels)}
+            />
+            <NumberField
+              label="Gecelik fiyat"
+              min={0}
+              value={reservation.pricePerNight}
+              onChange={(value) => updateReservationLocal(reservation.id, { pricePerNight: value })}
+            />
+            <DateField
+              disabled={lockStartedFields}
+              label="Giriş"
+              min={reservation.checkIn < today() ? reservation.checkIn : today()}
+              value={reservation.checkIn}
+              onChange={(value) =>
+                updateReservationLocal(reservation.id, {
+                  checkIn: value,
+                  checkOut: reservation.checkOut <= value ? addDays(value, 1) : reservation.checkOut
+                })
+              }
+            />
+            <DateField
+              disabled={lockStartedFields}
+              label="Çıkış"
+              min={addDays(reservation.checkIn, 1)}
+              value={reservation.checkOut}
+              onChange={(value) => updateReservationLocal(reservation.id, { checkOut: value })}
+            />
+            <NumberField
+              disabled={lockStartedFields}
+              label="Yetişkin"
+              min={1}
+              max={Math.max(reservationPreview.capacityLimit, 1)}
+              value={reservation.adults}
+              onChange={(value) => updateReservationLocal(reservation.id, { adults: value })}
+            />
+            <NumberField
+              disabled={lockStartedFields}
+              label="Çocuk"
+              min={0}
+              max={reservationMaxChildren}
+              value={reservation.children}
+              onChange={(value) => updateReservationLocal(reservation.id, { children: value })}
+            />
+            <TextArea
+              label="Misafir notu"
+              value={reservation.note ?? ""}
+              onChange={(value) => updateReservationLocal(reservation.id, { note: value })}
+            />
+            <TextArea
+              label="Panel notu"
+              value={reservation.adminNote ?? ""}
+              onChange={(value) => updateReservationLocal(reservation.id, { adminNote: value })}
+            />
+          </div>
+          <div className="admin-reservation-form-side">
+            <ReservationAvailabilityPreview preview={reservationPreview} />
+            {renderBlockedDates(reservation.roomSlug, reservation.id)}
+          </div>
+          <div className="admin-inline-actions">
+            <button
+              className="admin-primary-button"
+              disabled={updatingReservationId === reservation.id || Boolean(reservationPreview.error)}
+              type="button"
+              onClick={() => updateReservation(reservation.id)}
+            >
+              <Save size={16} />
+              {updatingReservationId === reservation.id ? "Güncelleniyor" : "Rezervasyonu Kaydet"}
+            </button>
+            <a className="admin-secondary-button" href={`tel:${reservation.phone.replace(/\s/g, "")}`}>
+              <PhoneCall size={15} />
+              Ara
+            </a>
+            {reservation.email ? (
+              <a className="admin-secondary-button" href={`mailto:${reservation.email}`}>
+                <Mail size={15} />
+                E-posta
+              </a>
+            ) : null}
+            <button className="admin-secondary-button" type="button" onClick={closeReservationEditor}>
+              Vazgeç
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    if (reservationMode === "new") {
+      return (
+        <section className="admin-panel-section" data-testid="admin-section-reservations">
+          {renderNewReservationForm()}
+        </section>
+      );
+    }
+
+    if (reservationMode === "edit") {
+      return (
+        <section className="admin-panel-section" data-testid="admin-section-reservations">
+          {editingReservation ? renderEditReservationForm(editingReservation) : <div className="admin-empty-state">Rezervasyon bulunamadı.</div>}
+        </section>
+      );
+    }
 
     return (
       <section className="admin-panel-section" data-testid="admin-section-reservations">
@@ -1281,10 +1685,16 @@ export function AdminDashboard({ initialContent, initialImages, initialReservati
             <h2>Rezervasyonlar</h2>
             <span>{archivedCount > 0 ? `${archivedCount} arşivlenmiş kayıt var` : "Site ve manuel kayıtlar"}</span>
           </div>
-          <button className="admin-secondary-button" type="button" onClick={refreshReservations}>
-            <RefreshCw size={16} />
-            Yenile
-          </button>
+          <div className="admin-inline-actions">
+            <button className="admin-primary-button" type="button" onClick={openNewReservationForm}>
+              <Plus size={16} />
+              Yeni rezervasyon
+            </button>
+            <button className="admin-secondary-button" type="button" onClick={refreshReservations}>
+              <RefreshCw size={16} />
+              Yenile
+            </button>
+          </div>
         </div>
         <div className="admin-toolbar">
           <label className="admin-search-field">
@@ -1311,198 +1721,118 @@ export function AdminDashboard({ initialContent, initialImages, initialReservati
             ))}
           </select>
         </div>
-        <div className="admin-reservation-create" data-testid="admin-create-reservation-form">
-          <div className="admin-list-heading">
-            <div>
-              <h3>Yeni rezervasyon</h3>
-              <span>Telefon veya resepsiyon kaydı</span>
-            </div>
-          </div>
-          <div className="admin-form-grid admin-form-grid--reservation">
-            <DateField
-              label="Giriş"
-              min={today()}
-              value={newReservation.checkIn}
-              onChange={(value) => updateNewReservationField("checkIn", value)}
-            />
-            <DateField
-              label="Çıkış"
-              min={addDays(newReservation.checkIn, 1)}
-              value={newReservation.checkOut}
-              onChange={(value) => updateNewReservationField("checkOut", value)}
-            />
-            <SelectField
-              label="Oda"
-              value={newReservation.roomSlug}
-              onChange={(value) => updateNewReservationField("roomSlug", value)}
-              options={roomOptions}
-            />
-            <SelectField
-              label="Kayıt durumu"
-              value={newReservation.status}
-              onChange={(value) => updateNewReservationField("status", value as ReservationStatus)}
-              options={Object.entries(reservationStatusLabels)}
-            />
-            <NumberField
-              label="Yetişkin"
-              min={1}
-              max={Math.max(newReservationPreview.capacityLimit, 1)}
-              value={newReservation.adults}
-              onChange={(value) => updateNewReservationField("adults", value)}
-            />
-            <NumberField
-              label="Çocuk"
-              min={0}
-              max={newReservationMaxChildren}
-              value={newReservation.children}
-              onChange={(value) => updateNewReservationField("children", value)}
-            />
-            <TextField label="Ad Soyad" value={newReservation.name} onChange={(value) => updateNewReservationField("name", value)} />
-            <TextField label="Telefon" type="tel" value={newReservation.phone} onChange={(value) => updateNewReservationField("phone", value)} />
-            <TextField label="E-posta" type="email" value={newReservation.email} onChange={(value) => updateNewReservationField("email", value)} />
-            <TextArea label="Misafir notu" value={newReservation.note} onChange={(value) => updateNewReservationField("note", value)} />
-            <TextArea label="Panel notu" value={newReservation.adminNote} onChange={(value) => updateNewReservationField("adminNote", value)} />
-          </div>
-          <ReservationAvailabilityPreview preview={newReservationPreview} />
-          <button
-            className="admin-primary-button"
-            data-testid="admin-create-reservation"
-            disabled={isCreatingReservation || Boolean(newReservationPreview.error)}
-            type="button"
-            onClick={createReservation}
-          >
-            <Plus size={16} />
-            {isCreatingReservation ? "Oluşturuluyor" : "Rezervasyon Oluştur"}
-          </button>
+        <div className="admin-column-control" aria-label="Rezervasyon tablo kolonları">
+          {(Object.keys(reservationColumnLabels) as ReservationColumn[]).map((column) => (
+            <label key={column}>
+              <input
+                checked={reservationColumns[column]}
+                onChange={() => toggleReservationColumn(column)}
+                type="checkbox"
+              />
+              <span>{reservationColumnLabels[column]}</span>
+            </label>
+          ))}
         </div>
         {filteredReservations.length === 0 ? (
           <div className="admin-empty-state">Henüz rezervasyon kaydı yok.</div>
         ) : (
-          <div className="admin-reservation-board">
-            {filteredReservations.map((reservation) => {
-              const reservationPreview = getReservationPreview({
-                excludeReservationId: reservation.id,
-                input: reservation,
-                reservations,
-                rooms: content.rooms
-              });
-              const reservationMaxChildren = Math.max(reservationPreview.capacityLimit - reservation.adults, 0);
-
-              return (
-                <article className={`admin-reservation-card admin-reservation-card--${reservation.status}`} key={reservation.id}>
-                <div className="admin-reservation-card__top">
-                  <div>
-                    <strong>{reservation.name}</strong>
-                    <span>{reservation.roomTitle}</span>
-                  </div>
-                  <small>{new Date(reservation.createdAt).toLocaleString("tr-TR")}</small>
-                </div>
-                <div className="admin-reservation-meta">
-                  <span>
-                    {reservation.checkIn} / {reservation.checkOut}
-                  </span>
-                  <span>{reservation.nights} gece</span>
-                  <span>{formatBookingCurrency(reservation.estimatedTotal, reservation.currency)}</span>
-                  <span>
-                    <PaymentBadge status={reservation.paymentStatus} />
-                  </span>
-                  <span>{reservation.source === "admin" ? "Panel" : "Site"}</span>
-                  <span>
-                    {reservation.adults} yetişkin
-                    {reservation.children > 0 ? `, ${reservation.children} çocuk` : ""}
-                  </span>
-                </div>
-                {reservation.paymentStatus !== "not_required" ? (
-                  <div className="admin-payment-summary">
-                    <span>{reservation.paymentProvider.toUpperCase()}</span>
-                    <strong>{formatBookingCurrency(reservation.paymentAmount || reservation.estimatedTotal, reservation.paymentCurrency)}</strong>
-                    {reservation.paymentReference ? <code>{reservation.paymentReference}</code> : null}
-                    {reservation.paymentFailureReason ? <em>{reservation.paymentFailureReason}</em> : null}
-                  </div>
-                ) : null}
-                {reservation.note ? <p className="admin-reservation-note">{reservation.note}</p> : null}
-                <ReservationAvailabilityPreview compact preview={reservationPreview} />
-                <div className="admin-reservation-actions">
-                  <a className="admin-secondary-button" href={`tel:${reservation.phone.replace(/\s/g, "")}`}>
-                    <PhoneCall size={15} />
-                    Ara
-                  </a>
-                  {reservation.email ? (
-                    <a className="admin-secondary-button" href={`mailto:${reservation.email}`}>
-                      <Mail size={15} />
-                      E-posta
-                    </a>
-                  ) : null}
-                </div>
-                <div className="admin-form-grid admin-form-grid--reservation">
-                  <SelectField
-                    label="Durum"
-                    value={reservation.status}
-                    onChange={(value) => updateReservationLocal(reservation.id, { status: value as ReservationStatus })}
-                    options={Object.entries(reservationStatusLabels)}
-                  />
-                  <SelectField
-                    label="Oda"
-                    value={reservation.roomSlug}
-                    onChange={(value) => updateReservationLocal(reservation.id, { roomSlug: value })}
-                    options={roomOptions}
-                  />
-                  <DateField
-                    label="Giriş"
-                    min={today()}
-                    value={reservation.checkIn}
-                    onChange={(value) =>
-                      updateReservationLocal(reservation.id, {
-                        checkIn: value,
-                        checkOut: reservation.checkOut <= value ? addDays(value, 1) : reservation.checkOut
-                      })
-                    }
-                  />
-                  <DateField
-                    label="Çıkış"
-                    min={addDays(reservation.checkIn, 1)}
-                    value={reservation.checkOut}
-                    onChange={(value) => updateReservationLocal(reservation.id, { checkOut: value })}
-                  />
-                  <NumberField
-                    label="Yetişkin"
-                    min={1}
-                    max={Math.max(reservationPreview.capacityLimit, 1)}
-                    value={reservation.adults}
-                    onChange={(value) => updateReservationLocal(reservation.id, { adults: value })}
-                  />
-                  <NumberField
-                    label="Çocuk"
-                    min={0}
-                    max={reservationMaxChildren}
-                    value={reservation.children}
-                    onChange={(value) => updateReservationLocal(reservation.id, { children: value })}
-                  />
-                  <TextField label="Ad Soyad" value={reservation.name} onChange={(value) => updateReservationLocal(reservation.id, { name: value })} />
-                  <TextField label="Telefon" type="tel" value={reservation.phone} onChange={(value) => updateReservationLocal(reservation.id, { phone: value })} />
-                  <TextField label="E-posta" type="email" value={reservation.email ?? ""} onChange={(value) => updateReservationLocal(reservation.id, { email: value })} />
-                  <TextArea
-                    label="Misafir notu"
-                    value={reservation.note ?? ""}
-                    onChange={(value) => updateReservationLocal(reservation.id, { note: value })}
-                  />
-                  <TextArea
-                    label="Panel notu"
-                    value={reservation.adminNote ?? ""}
-                    onChange={(value) => updateReservationLocal(reservation.id, { adminNote: value })}
-                  />
-                </div>
-                <button
-                  className="admin-primary-button"
-                  disabled={updatingReservationId === reservation.id || Boolean(reservationPreview.error)}
-                  type="button"
-                  onClick={() => updateReservation(reservation.id)}
-                >
-                  {updatingReservationId === reservation.id ? "Güncelleniyor" : "Rezervasyonu Kaydet"}
-                </button>
-                </article>
-              );
-            })}
+          <div className="admin-reservation-table-wrap">
+            <table className="admin-reservation-table">
+              <thead>
+                <tr>
+                  {reservationColumns.guest ? <th>Misafir</th> : null}
+                  {reservationColumns.room ? <th>Oda</th> : null}
+                  {reservationColumns.dates ? <th>Tarih</th> : null}
+                  {reservationColumns.guests ? <th>Kişi</th> : null}
+                  {reservationColumns.status ? <th>Durum</th> : null}
+                  {reservationColumns.payment ? <th>Ödeme</th> : null}
+                  {reservationColumns.total ? <th>Tutar</th> : null}
+                  {reservationColumns.source ? <th>Kaynak</th> : null}
+                  {reservationColumns.actions ? <th>İşlem</th> : null}
+                </tr>
+              </thead>
+              <tbody>
+                {filteredReservations.map((reservation) => (
+                  <tr key={reservation.id}>
+                    {reservationColumns.guest ? (
+                      <td>
+                        <strong>{reservation.name}</strong>
+                        <small>{reservation.phone}</small>
+                      </td>
+                    ) : null}
+                    {reservationColumns.room ? (
+                      <td>
+                        <strong>{reservation.roomTitle}</strong>
+                        <small>{formatBookingCurrency(reservation.pricePerNight, reservation.currency)} / gece</small>
+                      </td>
+                    ) : null}
+                    {reservationColumns.dates ? (
+                      <td>
+                        <strong>{formatDateLabel(reservation.checkIn)} - {formatDateLabel(reservation.checkOut)}</strong>
+                        <small>{reservation.nights} gece</small>
+                      </td>
+                    ) : null}
+                    {reservationColumns.guests ? (
+                      <td>
+                        <strong>{reservation.adults + reservation.children}</strong>
+                        <small>
+                          {reservation.adults} yetişkin{reservation.children ? `, ${reservation.children} çocuk` : ""}
+                        </small>
+                      </td>
+                    ) : null}
+                    {reservationColumns.status ? (
+                      <td>
+                        <StatusBadge status={reservation.status} />
+                      </td>
+                    ) : null}
+                    {reservationColumns.payment ? (
+                      <td>
+                        <PaymentBadge status={reservation.paymentStatus} />
+                        {reservation.paymentReference ? <small>{reservation.paymentReference}</small> : null}
+                      </td>
+                    ) : null}
+                    {reservationColumns.total ? (
+                      <td>
+                        <strong>{formatBookingCurrency(reservation.estimatedTotal, reservation.currency)}</strong>
+                        <small>{formatDateTimeLabel(reservation.createdAt)}</small>
+                      </td>
+                    ) : null}
+                    {reservationColumns.source ? (
+                      <td>
+                        <span className="admin-source-pill">{reservation.source === "admin" ? "Panel" : "Site"}</span>
+                      </td>
+                    ) : null}
+                    {reservationColumns.actions ? (
+                      <td>
+                        <div className="admin-table-actions">
+                          <button className="admin-secondary-button" type="button" onClick={() => openReservationEditor(reservation.id)}>
+                            <Pencil size={14} />
+                            Düzenle
+                          </button>
+                          <a className="admin-secondary-button" href={`tel:${reservation.phone.replace(/\s/g, "")}`}>
+                            <PhoneCall size={14} />
+                            Ara
+                          </a>
+                          <button
+                            className="admin-danger-button"
+                            disabled={updatingReservationId === reservation.id}
+                            type="button"
+                            onClick={() => {
+                              if (window.confirm("Bu rezervasyon arşivlensin mi?")) {
+                                updateReservationStatus(reservation.id, "archived");
+                              }
+                            }}
+                          >
+                            <Trash2 size={14} />
+                            Arşiv
+                          </button>
+                        </div>
+                      </td>
+                    ) : null}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
       </section>
@@ -2676,27 +3006,27 @@ function ReservationAvailabilityPreview({ compact = false, preview }: { compact?
     <div className={className}>
       <div>
         <strong>{preview.error || availabilityLabel}</strong>
-        <span>
-          {availability.nights} gece · {formatBookingCurrency(availability.estimatedTotal, availability.currency)}
-        </span>
+        <span>{preview.pricing.nights} gece · {formatBookingCurrency(preview.pricing.estimatedTotal, availability.currency)}</span>
       </div>
       <div>
         <strong>
           {preview.guestCount}/{preview.capacityLimit} misafir
         </strong>
-        <span>{availability.pricePerNight > 0 ? `${formatBookingCurrency(availability.pricePerNight, availability.currency)} / gece` : "Fiyat girilmemiş"}</span>
+        <span>{preview.pricing.pricePerNight > 0 ? `${formatBookingCurrency(preview.pricing.pricePerNight, availability.currency)} / gece` : "Fiyat girilmemiş"}</span>
       </div>
     </div>
   );
 }
 
 function TextField({
+  disabled = false,
   label,
   onBlur,
   onChange,
   type = "text",
   value
 }: {
+  disabled?: boolean;
   label: string;
   onBlur?: (value: string) => void;
   onChange: (value: string) => void;
@@ -2707,6 +3037,7 @@ function TextField({
     <label className="admin-field">
       <span>{label}</span>
       <input
+        disabled={disabled}
         onBlur={(event) => onBlur?.(event.target.value)}
         onChange={(event) => onChange(event.target.value)}
         type={type}
@@ -2742,11 +3073,13 @@ function PasswordField({
 }
 
 function DateField({
+  disabled = false,
   label,
   min,
   onChange,
   value
 }: {
+  disabled?: boolean;
   label: string;
   min?: string;
   onChange: (value: string) => void;
@@ -2755,18 +3088,20 @@ function DateField({
   return (
     <label className="admin-field">
       <span>{label}</span>
-      <input min={min} onChange={(event) => onChange(event.target.value)} type="date" value={value} />
+      <input disabled={disabled} min={min} onChange={(event) => onChange(event.target.value)} type="date" value={value} />
     </label>
   );
 }
 
 function NumberField({
+  disabled = false,
   label,
   max,
   min = 0,
   onChange,
   value
 }: {
+  disabled?: boolean;
   label: string;
   max?: number;
   min?: number;
@@ -2776,26 +3111,38 @@ function NumberField({
   return (
     <label className="admin-field">
       <span>{label}</span>
-      <input max={max} min={min} onChange={(event) => onChange(Number(event.target.value))} type="number" value={value} />
+      <input disabled={disabled} max={max} min={min} onChange={(event) => onChange(Number(event.target.value))} type="number" value={value} />
     </label>
   );
 }
 
-function TextArea({ label, onChange, value }: { label: string; onChange: (value: string) => void; value: string }) {
+function TextArea({
+  disabled = false,
+  label,
+  onChange,
+  value
+}: {
+  disabled?: boolean;
+  label: string;
+  onChange: (value: string) => void;
+  value: string;
+}) {
   return (
     <label className="admin-field admin-field--wide">
       <span>{label}</span>
-      <textarea onChange={(event) => onChange(event.target.value)} rows={4} value={value} />
+      <textarea disabled={disabled} onChange={(event) => onChange(event.target.value)} rows={4} value={value} />
     </label>
   );
 }
 
 function SelectField({
+  disabled = false,
   label,
   onChange,
   options,
   value
 }: {
+  disabled?: boolean;
   label: string;
   onChange: (value: string) => void;
   options: Array<[string, string]>;
@@ -2804,7 +3151,7 @@ function SelectField({
   return (
     <label className="admin-field">
       <span>{label}</span>
-      <select onChange={(event) => onChange(event.target.value)} value={value}>
+      <select disabled={disabled} onChange={(event) => onChange(event.target.value)} value={value}>
         {options.map(([optionValue, labelText]) => (
           <option key={optionValue} value={optionValue}>
             {labelText}

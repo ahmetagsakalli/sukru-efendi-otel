@@ -346,6 +346,28 @@ async function checkPublicReservationValidation(page, iteration) {
   expect(honeypot.status()).toBe(200);
 }
 
+async function checkPublicBookingPage(page) {
+  await page.goto(`${baseURL}/rezervasyon?room=suit-oda&checkIn=2026-08-10&checkOut=2026-08-12&adults=2&children=1`);
+  await expect(page.getByRole("heading", { level: 1, name: "Müsait tarihleri seçin, odanızı güvenle ayırın." })).toBeVisible();
+
+  const turkishForm = page.locator("form.booking-form--request").first();
+  await expect(turkishForm.getByLabel("Oda")).toHaveValue("suit-oda");
+  await expect(turkishForm.getByLabel("Giriş")).toHaveValue("2026-08-10");
+  await expect(turkishForm.getByLabel("Çıkış")).toHaveValue("2026-08-12");
+  await expect(turkishForm.getByLabel("Yetişkin")).toHaveValue("2");
+  await expect(turkishForm.getByLabel("Çocuk")).toHaveValue("1");
+
+  await page.goto(`${baseURL}/en/booking?room=suite-room&checkIn=2026-08-10&checkOut=2026-08-12&adults=2&children=1`);
+  const englishForm = page.locator("form.booking-form--request").first();
+  await expect(englishForm.getByLabel("Room")).toHaveValue("suit-oda");
+
+  await page.getByRole("button", { name: "Language selector" }).click();
+  await page.getByRole("menuitem", { name: "Zur deutschen Sprache wechseln" }).click();
+  await expect(page).toHaveURL(/\/de\/reservierung\?.*room=suite-zimmer/);
+  const germanForm = page.locator("form.booking-form--request").first();
+  await expect(germanForm.getByLabel("Zimmer")).toHaveValue("suit-oda");
+}
+
 async function checkPaymentInfrastructure(page, iteration) {
   const reservationResponse = await page.request.post(`${baseURL}/api/reservations`, {
     headers: smokeClientHeaders(iteration, 10),
@@ -367,7 +389,7 @@ async function checkPaymentInfrastructure(page, iteration) {
   const reservationJson = await reservationResponse.json();
   assert(reservationJson.reservation?.id, "Payment reservation response did not include an id.");
   expect(reservationJson.payment?.required).toBe(true);
-  expect(reservationJson.payment?.status).toBe("pending");
+  expect(reservationJson.payment?.status).toBe("processing");
 
   const paymentResponse = await page.request.post(`${baseURL}/api/payments/create`, {
     data: {
@@ -481,25 +503,33 @@ async function checkReservations(page, iteration) {
   expect(adminOverCapacity.status).toBe(400);
   expect(adminOverCapacity.json.error).toContain("en fazla 3 misafir");
 
-  const card = page.locator(".admin-reservation-card").filter({ hasText: `Smoke Misafir ${iteration}` }).first();
-  await expect(card).toBeVisible();
-  await card.getByLabel("Durum").selectOption("confirmed");
-  await card.getByLabel("Telefon").fill("+90 555 200 30 40");
-  await card.getByLabel("Panel notu").fill(`Smoke panel notu ${iteration}`);
+  const reservationsTable = page.locator(".admin-reservation-table");
+  const smokeRow = reservationsTable.locator("tbody tr").filter({ hasText: `Smoke Misafir ${iteration}` }).first();
+  await expect(smokeRow).toBeVisible();
+  await smokeRow.getByRole("button", { name: "Düzenle" }).click();
+
+  const editForm = page.getByTestId("admin-edit-reservation-form");
+  await expect(editForm).toBeVisible();
+  await editForm.getByLabel("Durum").selectOption("confirmed");
+  await editForm.getByLabel("Telefon").fill("+90 555 200 30 40");
+  await editForm.getByLabel("Panel notu").fill(`Smoke panel notu ${iteration}`);
 
   const [response] = await Promise.all([
     page.waitForResponse((candidate) => candidate.url().endsWith("/api/admin/reservations") && candidate.request().method() === "PATCH"),
-    card.getByRole("button", { name: "Rezervasyonu Kaydet" }).click()
+    editForm.getByRole("button", { name: "Rezervasyonu Kaydet" }).click()
   ]);
 
   expect(response.ok(), `Reservation update failed with ${response.status()}`).toBeTruthy();
   await expect(page.getByText("Rezervasyon güncellendi.")).toBeVisible();
 
+  await page.getByRole("button", { name: "Yeni rezervasyon" }).click();
   const createForm = page.getByTestId("admin-create-reservation-form");
+  await expect(createForm).toBeVisible();
   await createForm.getByLabel("Giriş").fill("2026-08-01");
   await createForm.getByLabel("Çıkış").fill("2026-08-03");
   await createForm.getByLabel("Oda").selectOption("suit-oda");
   await createForm.getByLabel("Kayıt durumu").selectOption("confirmed");
+  await createForm.getByLabel("Gecelik fiyat").fill("2250");
   await createForm.getByLabel("Ad Soyad").fill(`Suite Blokaj ${iteration}`);
   await createForm.getByLabel("Telefon").fill("+90 555 250 30 40");
 
@@ -527,21 +557,25 @@ async function checkReservations(page, iteration) {
   });
   expect(overbooked.status()).toBe(409);
 
-  await createForm.getByLabel("Giriş").fill("2026-08-10");
-  await createForm.getByLabel("Çıkış").fill("2026-08-12");
-  await createForm.getByLabel("Oda").selectOption("standart-oda");
-  await createForm.getByLabel("Kayıt durumu").selectOption("confirmed");
-  await createForm.getByLabel("Ad Soyad").fill(`Manuel Smoke ${iteration}`);
-  await createForm.getByLabel("Telefon").fill("+90 555 300 40 50");
+  await page.getByRole("button", { name: "Yeni rezervasyon" }).click();
+  const secondCreateForm = page.getByTestId("admin-create-reservation-form");
+  await expect(secondCreateForm).toBeVisible();
+  await secondCreateForm.getByLabel("Giriş").fill("2026-08-10");
+  await secondCreateForm.getByLabel("Çıkış").fill("2026-08-12");
+  await secondCreateForm.getByLabel("Oda").selectOption("standart-oda");
+  await secondCreateForm.getByLabel("Kayıt durumu").selectOption("confirmed");
+  await secondCreateForm.getByLabel("Gecelik fiyat").fill("1750");
+  await secondCreateForm.getByLabel("Ad Soyad").fill(`Manuel Smoke ${iteration}`);
+  await secondCreateForm.getByLabel("Telefon").fill("+90 555 300 40 50");
 
   const [createResponse] = await Promise.all([
     page.waitForResponse((candidate) => candidate.url().endsWith("/api/admin/reservations") && candidate.request().method() === "POST"),
-    page.getByTestId("admin-create-reservation").click()
+    secondCreateForm.getByTestId("admin-create-reservation").click()
   ]);
 
   expect(createResponse.ok(), `Manual reservation create failed with ${createResponse.status()}`).toBeTruthy();
   await expect(page.getByText("Rezervasyon oluşturuldu.")).toBeVisible();
-  await expect(page.locator(".admin-reservation-card").filter({ hasText: `Manuel Smoke ${iteration}` })).toBeVisible();
+  await expect(page.locator(".admin-reservation-table tbody tr").filter({ hasText: `Manuel Smoke ${iteration}` })).toBeVisible();
 }
 
 async function checkRooms(page) {
@@ -711,6 +745,7 @@ async function runIteration(browser, iteration, imageA, imageB, invalidImage) {
   expect(unauthorized.status()).toBe(401);
   await checkSecurityHeaders(page);
   await checkPublicReservationValidation(page, iteration);
+  await checkPublicBookingPage(page);
   await checkPaymentInfrastructure(page, iteration);
   await loginOrSetup(page);
   await checkDashboardShell(page);

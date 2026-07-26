@@ -18,7 +18,7 @@ export default function PaytrPaymentPage({ searchParams }: { searchParams: { tok
           <span className="payment-eyebrow">Ödeme</span>
           <h1>Ödeme başlatılamadı</h1>
           <p>Ödeme oturumu geçersiz görünüyor. Lütfen rezervasyon formunu tekrar gönderin veya otelle iletişime geçin.</p>
-          <Link className="booking-link booking-link--solid" href="/#rezervasyon">
+          <Link className="booking-link booking-link--solid" href="/rezervasyon">
             Rezervasyona dön
           </Link>
         </section>

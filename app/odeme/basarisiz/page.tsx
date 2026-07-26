@@ -8,7 +8,7 @@ export default function PaymentFailedPage() {
         <h1>Ödeme işlemi tamamlanamadı</h1>
         <p>Kart doğrulaması veya ödeme onayı başarısız oldu. Tekrar deneyebilir ya da otelle doğrudan iletişime geçebilirsiniz.</p>
         <div className="payment-actions">
-          <Link className="booking-link booking-link--solid" href="/#rezervasyon">
+          <Link className="booking-link booking-link--solid" href="/rezervasyon">
             Tekrar dene
           </Link>
           <Link className="booking-link booking-link--outline" href="/iletisim">

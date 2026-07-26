@@ -23,6 +23,7 @@ export function Header({ locale = defaultLocale }: { locale?: PublicLocale }) {
   const [isOpen, setIsOpen] = useState(false);
   const [isLanguageOpen, setIsLanguageOpen] = useState(false);
   const pathname = usePathname() ?? getHomeHref(locale);
+  const [currentHref, setCurrentHref] = useState(pathname);
   const activeLocale = getLocaleFromPathname(pathname) ?? locale;
   const copy = getPublicCopy(activeLocale);
   const navItems = [
@@ -42,6 +43,10 @@ export function Header({ locale = defaultLocale }: { locale?: PublicLocale }) {
 
   useEffect(() => {
     setIsLanguageOpen(false);
+  }, [currentHref]);
+
+  useEffect(() => {
+    setCurrentHref(`${pathname}${window.location.search}`);
   }, [pathname]);
 
   useEffect(() => {
@@ -90,7 +95,7 @@ export function Header({ locale = defaultLocale }: { locale?: PublicLocale }) {
           {publicLocales.map((item) => (
             <Link
               key={item}
-              href={getLanguageSwitchHref(pathname, item)}
+              href={getLanguageSwitchHref(currentHref, item)}
               aria-current={item === activeLocale ? "true" : undefined}
               aria-label={localeLabels[item].aria}
               role="menuitem"

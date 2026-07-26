@@ -2,8 +2,8 @@ import { unstable_noStore as noStore } from "next/cache";
 import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { getRoomAvailability, getStayPricing, validateRoomOccupancy } from "@/lib/booking";
-import { getInitialPaymentFields } from "@/lib/payments";
+import { BOOKING_CURRENCY, calculateNights, getRoomAvailability, getStayPricing, validateRoomOccupancy } from "@/lib/booking";
+import { getInitialPaymentFields, isPaymentCollectionEnabled } from "@/lib/payments";
 import type { Room } from "@/lib/site-content-schema";
 import { isBlobStorageEnabled, readBlobText, writeBlobText } from "@/lib/storage";
 import {
@@ -181,6 +181,29 @@ function ensureRoomOccupancy(room: Room, adults: number, children: number) {
   }
 }
 
+function getWebsiteReservationStatus(): ReservationRequest["status"] {
+  if (isPaymentCollectionEnabled()) {
+    return "new";
+  }
+
+  const mode = process.env.WEBSITE_RESERVATION_MODE?.trim().toLocaleLowerCase("en-US");
+  return mode === "manual" || mode === "request" ? "new" : "confirmed";
+}
+
+function getWebsitePaymentFields(now: string): ReservationPaymentPatch {
+  const payment = getInitialPaymentFields();
+
+  if (!isPaymentCollectionEnabled()) {
+    return payment;
+  }
+
+  return {
+    ...payment,
+    paymentStartedAt: now,
+    paymentStatus: "processing"
+  };
+}
+
 function buildReservationRecord({
   id,
   createdAt,
@@ -201,7 +224,17 @@ function buildReservationRecord({
   updatedAt: string;
 }) {
   ensureRoomOccupancy(room, input.adults, input.children);
-  const pricing = getStayPricing(room, input.checkIn, input.checkOut);
+  const hasAdminPrice = "pricePerNight" in input && typeof input.pricePerNight === "number";
+  const nights = calculateNights(input.checkIn, input.checkOut);
+  const pricePerNight = hasAdminPrice ? Math.max(0, Math.round(input.pricePerNight ?? 0)) : 0;
+  const pricing = hasAdminPrice
+    ? {
+        currency: BOOKING_CURRENCY,
+        estimatedTotal: nights * pricePerNight,
+        nights,
+        pricePerNight
+      }
+    : getStayPricing(room, input.checkIn, input.checkOut);
 
   return reservationRequestSchema.parse({
     id,
@@ -241,10 +274,10 @@ export async function createReservationRequest(input: CreateReservationRequestIn
       id: crypto.randomUUID(),
       createdAt: now,
       input,
-      payment: getInitialPaymentFields(),
+      payment: getWebsitePaymentFields(now),
       room,
       source: "website",
-      status: "new",
+      status: getWebsiteReservationStatus(),
       updatedAt: now
     });
 

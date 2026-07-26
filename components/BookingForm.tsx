@@ -8,6 +8,7 @@ import {
   interpolate,
   type PublicLocale
 } from "@/lib/i18n";
+import type { BookingInitialValues } from "@/lib/booking-url";
 import type { Room } from "@/lib/site-content-schema";
 
 type BookingFormState = {
@@ -36,6 +37,13 @@ type AvailabilityRoom = {
   roomSlug: string;
   totalRooms: number;
   totalLabel: string;
+};
+
+type BookingFormProps = {
+  initialValues?: BookingInitialValues;
+  locale?: PublicLocale;
+  rooms: Room[];
+  sectionClassName?: string;
 };
 
 function formatDateOnly(date: Date) {
@@ -85,16 +93,29 @@ function getNightLabel(nights: number, locale: PublicLocale, fallback: string) {
   return fallback;
 }
 
-export function BookingForm({ rooms, locale = defaultLocale }: { rooms: Room[]; locale?: PublicLocale }) {
+export function BookingForm({ initialValues, rooms, locale = defaultLocale, sectionClassName }: BookingFormProps) {
   const defaultRoom = rooms[1] ?? rooms[0];
   const copy = getPublicCopy(locale);
   const hasInitialAvailabilityQuery = Boolean(defaultRoom?.slug);
+  const initialBookingFields = useMemo(
+    () => ({
+      checkIn: initialValues?.checkIn ?? today(),
+      checkOut: initialValues?.checkOut ?? tomorrow(),
+      roomSlug: initialValues?.roomSlug ?? defaultRoom?.slug ?? "",
+      adults: initialValues?.adults ?? "2",
+      children: initialValues?.children ?? "0"
+    }),
+    [
+      defaultRoom?.slug,
+      initialValues?.adults,
+      initialValues?.checkIn,
+      initialValues?.checkOut,
+      initialValues?.children,
+      initialValues?.roomSlug
+    ]
+  );
   const [form, setForm] = useState<BookingFormState>({
-    checkIn: today(),
-    checkOut: tomorrow(),
-    roomSlug: defaultRoom?.slug ?? "",
-    adults: "2",
-    children: "0",
+    ...initialBookingFields,
     name: "",
     phone: "",
     email: "",
@@ -131,6 +152,13 @@ export function BookingForm({ rooms, locale = defaultLocale }: { rooms: Room[]; 
     const remainingCapacity = Math.max(selectedRoomCapacity - Math.max(adults, 1), 0);
     return Array.from({ length: remainingCapacity + 1 }, (_, index) => String(index));
   }, [adults, selectedRoomCapacity]);
+
+  useEffect(() => {
+    setForm((current) => ({
+      ...current,
+      ...initialBookingFields
+    }));
+  }, [initialBookingFields]);
 
   useEffect(() => {
     if (!selectedRoom?.slug || !datesAreValid) {
@@ -244,6 +272,7 @@ export function BookingForm({ rooms, locale = defaultLocale }: { rooms: Room[]; 
           id?: string;
           nights?: number;
           paymentStatus?: string;
+          status?: string;
           totalLabel?: string;
         };
         payment?: {
@@ -288,17 +317,20 @@ export function BookingForm({ rooms, locale = defaultLocale }: { rooms: Room[]; 
       }
 
       setMessageType("success");
+      const isConfirmed = result.reservation?.status === "confirmed";
       const totalLabel =
         selectedRoomAvailability?.estimatedTotal && selectedRoomAvailability.estimatedTotal > 0
           ? formatCurrency(selectedRoomAvailability.estimatedTotal, locale, selectedRoomAvailability.currency)
           : result.reservation?.totalLabel;
       setMessage(
         totalLabel
-          ? interpolate(copy.bookingForm.requestWithTotal, {
+          ? interpolate(isConfirmed ? copy.bookingForm.confirmedWithTotal : copy.bookingForm.requestWithTotal, {
               id: result.reservation?.id?.slice(0, 8) ?? "-",
               total: totalLabel
             })
-          : copy.bookingForm.requestWithoutTotal
+          : isConfirmed
+            ? copy.bookingForm.confirmedWithoutTotal
+            : copy.bookingForm.requestWithoutTotal
       );
       setForm((current) => ({
         ...current,
@@ -324,7 +356,11 @@ export function BookingForm({ rooms, locale = defaultLocale }: { rooms: Room[]; 
     : "";
 
   return (
-    <section className="hero-reservation" id="rezervasyon" aria-label={copy.bookingForm.ariaLabel}>
+    <section
+      className={["hero-reservation", sectionClassName].filter(Boolean).join(" ")}
+      id="rezervasyon"
+      aria-label={copy.bookingForm.ariaLabel}
+    >
       <form className="booking-form booking-form--hero booking-form--request" onSubmit={submitReservation}>
         <label>
           <span>{copy.bookingForm.checkIn}</span>

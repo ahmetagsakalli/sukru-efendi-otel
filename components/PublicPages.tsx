@@ -10,6 +10,7 @@ import { RoomCard } from "@/components/RoomCard";
 import { RoomStats } from "@/components/RoomStats";
 import { StructuredData } from "@/components/StructuredData";
 import { VisualImage } from "@/components/VisualImage";
+import { getBookingInitialValues, type BookingSearchParams } from "@/lib/booking-url";
 import {
   getBookingHref,
   getPublicCopy,
@@ -106,6 +107,43 @@ export async function PublicRoomsPage({ locale }: { locale: PublicLocale }) {
   );
 }
 
+export async function PublicBookingPage({
+  locale,
+  searchParams
+}: {
+  locale: PublicLocale;
+  searchParams?: BookingSearchParams;
+}) {
+  const content = localizeSiteContent(await getSiteContent(), locale);
+  const { rooms } = content;
+  const copy = getPublicCopy(locale);
+  const initialValues = getBookingInitialValues(searchParams, rooms, locale);
+
+  return (
+    <div className="page-transition">
+      <PageIntro kicker={copy.bookingPage.kicker} title={copy.bookingPage.title}>
+        {copy.bookingPage.body}
+      </PageIntro>
+      <BookingForm
+        rooms={rooms}
+        locale={locale}
+        initialValues={initialValues}
+        sectionClassName="booking-page-reservation"
+      />
+      <section className="section booking-page-rooms">
+        <div className="section-title section-title--center">
+          <h2>{copy.home.roomsTitle}</h2>
+        </div>
+        <div className="room-grid room-grid--wide">
+          {rooms.map((room) => (
+            <RoomCard room={room} locale={locale} key={room.slug} />
+          ))}
+        </div>
+      </section>
+    </div>
+  );
+}
+
 export async function PublicRoomDetailPage({
   locale,
   originalSlug
@@ -157,7 +195,7 @@ export async function PublicRoomDetailPage({
             ))}
           </div>
           <div className="room-detail-actions">
-            <Link className="booking-link booking-link--glass" href={getBookingHref(locale)}>
+            <Link className="booking-link booking-link--glass" href={getBookingHref(locale, { roomSlug: room.slug })}>
               {copy.roomDetail.booking}
             </Link>
           </div>
@@ -207,7 +245,7 @@ export async function PublicRoomDetailPage({
         <aside className="room-detail-reservation">
           <p>{copy.roomDetail.directBooking}</p>
           <h2>{room.price}</h2>
-          <Link className="booking-link booking-link--solid" href={getBookingHref(locale)}>
+          <Link className="booking-link booking-link--solid" href={getBookingHref(locale, { roomSlug: room.slug })}>
             {copy.roomDetail.booking}
           </Link>
         </aside>

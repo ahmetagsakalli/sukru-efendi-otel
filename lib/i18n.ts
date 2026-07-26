@@ -12,26 +12,29 @@ export const localeLabels: Record<PublicLocale, { short: string; native: string;
   de: { short: "DE", native: "Deutsch", aria: "Zur deutschen Sprache wechseln" }
 };
 
-export type RouteKey = "home" | "rooms" | "history" | "gallery" | "contact";
+export type RouteKey = "home" | "rooms" | "history" | "gallery" | "contact" | "booking";
 
 const routeSegments: Record<PublicLocale, Record<Exclude<RouteKey, "home">, string>> = {
   tr: {
     rooms: "odalar",
     history: "tarihce",
     gallery: "galeri",
-    contact: "iletisim"
+    contact: "iletisim",
+    booking: "rezervasyon"
   },
   en: {
     rooms: "rooms",
     history: "history",
     gallery: "gallery",
-    contact: "contact"
+    contact: "contact",
+    booking: "booking"
   },
   de: {
     rooms: "zimmer",
     history: "geschichte",
     gallery: "galerie",
-    contact: "kontakt"
+    contact: "kontakt",
+    booking: "reservierung"
   }
 };
 
@@ -84,8 +87,30 @@ export function getRouteHref(locale: PublicLocale, route: RouteKey) {
   return `${getLocalePrefix(locale)}/${routeSegments[locale][route]}`;
 }
 
-export function getBookingHref(locale: PublicLocale) {
-  return `${getHomeHref(locale)}#rezervasyon`;
+export function getBookingHref(
+  locale: PublicLocale,
+  params?: {
+    adults?: number | string;
+    checkIn?: string;
+    checkOut?: string;
+    children?: number | string;
+    roomSlug?: string;
+  }
+) {
+  const href = getRouteHref(locale, "booking");
+
+  if (!params) return href;
+
+  const query = new URLSearchParams();
+
+  if (params.checkIn) query.set("checkIn", params.checkIn);
+  if (params.checkOut) query.set("checkOut", params.checkOut);
+  if (params.roomSlug) query.set("room", getLocalizedRoomSlug(params.roomSlug, locale));
+  if (params.adults) query.set("adults", String(params.adults));
+  if (params.children) query.set("children", String(params.children));
+
+  const queryString = query.toString();
+  return queryString ? `${href}?${queryString}` : href;
 }
 
 export function getServicesHref(locale: PublicLocale) {
@@ -102,6 +127,18 @@ export function getLocalizedRoomSlug(originalSlug: string, locale: PublicLocale)
 
 export function getOriginalRoomSlug(localizedSlug: string, locale: PublicLocale) {
   return localizedRoomSlugs[locale][localizedSlug] ?? (locale === defaultLocale ? localizedSlug : "");
+}
+
+export function getOriginalRoomSlugFromAnyLocale(slug: string) {
+  for (const locale of publicLocales) {
+    const originalSlug = localizedRoomSlugs[locale][slug];
+
+    if (originalSlug) {
+      return originalSlug;
+    }
+  }
+
+  return roomSlugTranslations[defaultLocale][slug] ? slug : "";
 }
 
 export function getRoomHref(originalSlug: string, locale: PublicLocale) {
@@ -123,7 +160,8 @@ function findRouteBySegment(segment: string | undefined, locale: PublicLocale): 
 }
 
 export function getLanguageSwitchHref(pathname: string, targetLocale: PublicLocale) {
-  const cleanPathname = pathname.split(/[?#]/)[0] || "/";
+  const [rawPathname, rawQuery = ""] = pathname.split("?");
+  const cleanPathname = rawPathname.split("#")[0] || "/";
   const currentLocale = getLocaleFromPathname(cleanPathname);
   const pathWithoutLocale = stripLocalePrefix(cleanPathname, currentLocale);
 
@@ -143,7 +181,26 @@ export function getLanguageSwitchHref(pathname: string, targetLocale: PublicLoca
     return originalSlug ? getRoomHref(originalSlug, targetLocale) : getRouteHref(targetLocale, "rooms");
   }
 
-  return getRouteHref(targetLocale, route);
+  const href = getRouteHref(targetLocale, route);
+
+  if (route === "booking" && rawQuery) {
+    const query = new URLSearchParams(rawQuery);
+    const roomQuery = query.get("room") ?? query.get("roomSlug");
+
+    if (roomQuery) {
+      const originalRoomSlug = getOriginalRoomSlug(roomQuery, currentLocale) || getOriginalRoomSlugFromAnyLocale(roomQuery);
+
+      if (originalRoomSlug) {
+        query.set("room", getLocalizedRoomSlug(originalRoomSlug, targetLocale));
+        query.delete("roomSlug");
+      }
+    }
+
+    const queryString = query.toString();
+    return queryString ? `${href}?${queryString}` : href;
+  }
+
+  return href;
 }
 
 export const publicCopy = {
@@ -196,7 +253,7 @@ export const publicCopy = {
       roomsAvailable: "oda müsait",
       perNight: "gece",
       guests: "misafir",
-      submit: "Rezervasyon Talebi Gönder",
+      submit: "Rezervasyonu Tamamla",
       submitting: "Gönderiliyor",
       chooseDate: "Uygun Tarih Seçin",
       paymentRedirect: "Rezervasyon talebiniz alındı. Güvenli ödeme ekranına yönlendiriliyorsunuz.",
@@ -205,9 +262,18 @@ export const publicCopy = {
       requestWithTotal:
         "Talebiniz alındı. Talep no {id} · Tahmini toplam {total}. Otel kısa süre içinde sizinle iletişime geçecek.",
       requestWithoutTotal: "Talebiniz alındı. Otel kısa süre içinde sizinle iletişime geçecek.",
+      confirmedWithTotal:
+        "Rezervasyonunuz oluşturuldu. Rezervasyon no {id} · Tahmini toplam {total}. Otel gerekli durumda sizinle iletişime geçebilir.",
+      confirmedWithoutTotal: "Rezervasyonunuz oluşturuldu. Otel gerekli durumda sizinle iletişime geçebilir.",
       requestFailed: "Talep gönderilemedi.",
       connectionError: "Bağlantı kurulamadı. Lütfen telefon veya WhatsApp üzerinden bize ulaşın.",
       occupancyError: "{room} için en fazla {capacity} misafir seçilebilir."
+    },
+    bookingPage: {
+      kicker: "Doğrudan rezervasyon",
+      title: "Müsait tarihleri seçin, odanızı güvenle ayırın.",
+      body:
+        "Tarih, oda ve misafir bilgilerini seçtiğinizde sistem müsaitliği ve toplam tutarı anlık hesaplar. Rezervasyonunuz otelin paneline doğrudan düşer."
     },
     rooms: {
       statsAria: "Oda sayıları",
@@ -262,6 +328,9 @@ export const publicCopy = {
       contactTitle: "İletişim",
       contactDescription: "Şükrü Efendi Ottoman Hotel telefon, WhatsApp, e-posta ve konum bilgileri.",
       contactOgDescription: "Rezervasyon, telefon, WhatsApp, e-posta ve Ordu merkez konum bilgileri.",
+      bookingTitle: "Rezervasyon",
+      bookingDescription: "Şükrü Efendi Ottoman Hotel için oda müsaitliği, tarih seçimi ve doğrudan rezervasyon.",
+      bookingOgDescription: "Ordu merkezde konaklama için müsait tarihleri kontrol edip doğrudan rezervasyon yapın.",
       historyTitle: "Tarihçe",
       historyDescription: "Şükrü Efendi Ottoman Hotel tarihi yapısı ve korunmuş atmosferi."
     }
@@ -315,7 +384,7 @@ export const publicCopy = {
       roomsAvailable: "rooms available",
       perNight: "night",
       guests: "guests",
-      submit: "Send Reservation Request",
+      submit: "Complete Booking",
       submitting: "Sending",
       chooseDate: "Choose Available Dates",
       paymentRedirect: "Your reservation request has been received. Redirecting you to secure payment.",
@@ -324,9 +393,18 @@ export const publicCopy = {
       requestWithTotal:
         "Your request has been received. Request no {id} · Estimated total {total}. The hotel will contact you shortly.",
       requestWithoutTotal: "Your request has been received. The hotel will contact you shortly.",
+      confirmedWithTotal:
+        "Your booking has been created. Booking no {id} · Estimated total {total}. The hotel may contact you if needed.",
+      confirmedWithoutTotal: "Your booking has been created. The hotel may contact you if needed.",
       requestFailed: "The request could not be sent.",
       connectionError: "Could not connect. Please contact us by phone or WhatsApp.",
       occupancyError: "{room} allows up to {capacity} guests."
+    },
+    bookingPage: {
+      kicker: "Direct booking",
+      title: "Choose your dates and reserve your room securely.",
+      body:
+        "Select dates, room and guests to check live availability and estimated total. Your booking is sent directly to the hotel panel."
     },
     rooms: {
       statsAria: "Room counts",
@@ -381,6 +459,9 @@ export const publicCopy = {
       contactTitle: "Contact",
       contactDescription: "Phone, WhatsApp, email and location details for Şükrü Efendi Ottoman Hotel.",
       contactOgDescription: "Reservation, phone, WhatsApp, email and central Ordu location details.",
+      bookingTitle: "Booking",
+      bookingDescription: "Room availability, date selection and direct booking for Şükrü Efendi Ottoman Hotel.",
+      bookingOgDescription: "Check available dates and book directly for your stay in central Ordu.",
       historyTitle: "History",
       historyDescription: "The historic building and preserved atmosphere of Şükrü Efendi Ottoman Hotel."
     }
@@ -434,7 +515,7 @@ export const publicCopy = {
       roomsAvailable: "Zimmer verfügbar",
       perNight: "Nacht",
       guests: "Gäste",
-      submit: "Reservierungsanfrage senden",
+      submit: "Reservierung abschließen",
       submitting: "Wird gesendet",
       chooseDate: "Verfügbare Daten wählen",
       paymentRedirect: "Ihre Reservierungsanfrage wurde empfangen. Sie werden zur sicheren Zahlung weitergeleitet.",
@@ -443,9 +524,18 @@ export const publicCopy = {
       requestWithTotal:
         "Ihre Anfrage wurde empfangen. Anfrage Nr. {id} · Geschätztsumme {total}. Das Hotel meldet sich in Kürze.",
       requestWithoutTotal: "Ihre Anfrage wurde empfangen. Das Hotel meldet sich in Kürze.",
+      confirmedWithTotal:
+        "Ihre Reservierung wurde erstellt. Reservierungsnr. {id} · Geschätzte Summe {total}. Das Hotel kontaktiert Sie bei Bedarf.",
+      confirmedWithoutTotal: "Ihre Reservierung wurde erstellt. Das Hotel kontaktiert Sie bei Bedarf.",
       requestFailed: "Die Anfrage konnte nicht gesendet werden.",
       connectionError: "Keine Verbindung möglich. Bitte kontaktieren Sie uns per Telefon oder WhatsApp.",
       occupancyError: "{room} erlaubt bis zu {capacity} Gäste."
+    },
+    bookingPage: {
+      kicker: "Direkte Reservierung",
+      title: "Wählen Sie Ihre Daten und reservieren Sie Ihr Zimmer sicher.",
+      body:
+        "Wählen Sie Daten, Zimmer und Gäste aus, um Verfügbarkeit und geschätzte Summe direkt zu prüfen. Ihre Reservierung wird an das Hotelpanel gesendet."
     },
     rooms: {
       statsAria: "Zimmeranzahl",
@@ -500,6 +590,9 @@ export const publicCopy = {
       contactTitle: "Kontakt",
       contactDescription: "Telefon, WhatsApp, E-Mail und Standort des Şükrü Efendi Ottoman Hotel.",
       contactOgDescription: "Reservierung, Telefon, WhatsApp, E-Mail und Lage im Zentrum von Ordu.",
+      bookingTitle: "Reservierung",
+      bookingDescription: "Zimmerverfügbarkeit, Datumsauswahl und direkte Reservierung für das Şükrü Efendi Ottoman Hotel.",
+      bookingOgDescription: "Prüfen Sie verfügbare Daten und buchen Sie direkt für Ihren Aufenthalt im Zentrum von Ordu.",
       historyTitle: "Geschichte",
       historyDescription: "Das historische Gebäude und die bewahrte Atmosphäre des Şükrü Efendi Ottoman Hotel."
     }
@@ -552,11 +645,14 @@ type PublicCopy = {
     | "paymentStartFailed"
     | "requestWithTotal"
     | "requestWithoutTotal"
+    | "confirmedWithTotal"
+    | "confirmedWithoutTotal"
     | "requestFailed"
     | "connectionError"
     | "occupancyError",
     string
   >;
+  bookingPage: Record<"kicker" | "title" | "body", string>;
   rooms: Record<
     | "statsAria"
     | "totalRooms"
@@ -597,6 +693,9 @@ type PublicCopy = {
     | "contactTitle"
     | "contactDescription"
     | "contactOgDescription"
+    | "bookingTitle"
+    | "bookingDescription"
+    | "bookingOgDescription"
     | "historyTitle"
     | "historyDescription",
     string
@@ -1026,6 +1125,11 @@ export function getPageMetadata(content: SiteContent, locale: PublicLocale, rout
       description: metadata.contactDescription,
       image: "/hotel-images/gallery-reception-desk.webp"
     },
+    booking: {
+      title: metadata.bookingTitle,
+      description: metadata.bookingDescription,
+      image: "/hotel-images/gallery-reception-desk.webp"
+    },
     history: {
       title: metadata.historyTitle,
       description: metadata.historyDescription,
@@ -1037,7 +1141,11 @@ export function getPageMetadata(content: SiteContent, locale: PublicLocale, rout
   return {
     title: item.title,
     description: item.description,
-    keywords: getLocalizedKeywords(locale, site.name, route === "rooms" ? [metadata.roomsTitle] : []),
+    keywords: getLocalizedKeywords(
+      locale,
+      site.name,
+      route === "rooms" ? [metadata.roomsTitle] : route === "booking" ? [metadata.bookingTitle] : []
+    ),
     alternates: {
       canonical: href,
       languages: getAlternateLanguages(site.canonicalUrl, route)
@@ -1050,6 +1158,8 @@ export function getPageMetadata(content: SiteContent, locale: PublicLocale, rout
           ? metadata.roomsOgDescription
           : route === "contact"
             ? metadata.contactOgDescription
+            : route === "booking"
+              ? metadata.bookingOgDescription
             : item.description,
       url,
       images: [item.image]
