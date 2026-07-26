@@ -1774,6 +1774,44 @@ h3,
   padding: 7px 10px;
 }
 
+.admin-feed-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.admin-feed-link {
+  background: var(--admin-panel-soft);
+  border: 1px solid var(--admin-line);
+  border-radius: 8px;
+  color: inherit;
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  padding: 13px;
+}
+
+.admin-feed-link:hover {
+  border-color: rgba(49, 87, 213, 0.28);
+}
+
+.admin-feed-link strong,
+.admin-feed-link span {
+  min-width: 0;
+}
+
+.admin-feed-link strong {
+  color: var(--admin-ink);
+  font-size: 13px;
+}
+
+.admin-feed-link span {
+  color: var(--admin-muted);
+  font-size: 12px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
 .admin-payment-summary {
   align-items: center;
   background: #f8fafc;
@@ -2143,6 +2181,7 @@ h3,
 
   .admin-payment-detail-grid,
   .admin-payment-metrics,
+  .admin-feed-grid,
   .admin-reservation-preview {
     grid-template-columns: 1fr;
   }

@@ -41,11 +41,13 @@ import {
   getRoomCapacityLimit,
   parseRoomPrice
 } from "@/lib/booking";
+import type { HotelCenterData, HotelCenterRate, HotelCenterSettings } from "@/lib/hotel-center-schema";
 import type { PaymentStatus, ReservationRequest, ReservationStatus } from "@/lib/reservation-schema";
 import type { AdminImage, GalleryItem, Room, RoomFeature, SiteContent } from "@/lib/site-content-schema";
 
 type AdminDashboardProps = {
   initialContent: SiteContent;
+  initialHotelCenter: HotelCenterData;
   initialImages: AdminImage[];
   initialReservations: ReservationRequest[];
 };
@@ -55,6 +57,7 @@ type AdminTab =
   | "rooms"
   | "reservations"
   | "payments"
+  | "hotelCenter"
   | "guests"
   | "inbox"
   | "history"
@@ -82,6 +85,13 @@ type AdminReservationDraft = {
 type ReservationMode = "list" | "new" | "edit";
 type ReservationColumn = "guest" | "room" | "dates" | "guests" | "status" | "payment" | "total" | "source" | "actions";
 
+type HotelCenterRateDraft = Pick<HotelCenterRate, "availableRooms" | "closed" | "date" | "minNights" | "pricePerNight" | "roomSlug">;
+
+type HotelCenterBulkDraft = {
+  days: number;
+  startDate: string;
+};
+
 type GuestProfile = {
   key: string;
   name: string;
@@ -100,6 +110,7 @@ const tabs: Array<{ id: AdminTab; label: string; icon: ReactNode }> = [
   { id: "rooms", label: "Odalar", icon: <BedDouble size={18} /> },
   { id: "reservations", label: "Rezervasyonlar", icon: <CalendarCheck size={18} /> },
   { id: "payments", label: "Ödemeler", icon: <CreditCard size={18} /> },
+  { id: "hotelCenter", label: "Google Hotel", icon: <Hotel size={18} /> },
   { id: "guests", label: "Misafirler", icon: <Users size={18} /> },
   { id: "inbox", label: "Gelen Kutusu", icon: <Inbox size={18} /> },
   { id: "history", label: "Hareketler", icon: <Clock3 size={18} /> },
@@ -338,6 +349,26 @@ function createReservationDraft(rooms: Room[]): AdminReservationDraft {
   };
 }
 
+function createHotelRateDraft(rooms: Room[]): HotelCenterRateDraft {
+  const room = rooms[0];
+
+  return {
+    availableRooms: room?.count ?? 0,
+    closed: false,
+    date: today(),
+    minNights: 1,
+    pricePerNight: room ? parseRoomPrice(room.price) : 0,
+    roomSlug: room?.slug ?? ""
+  };
+}
+
+function createHotelBulkDraft(): HotelCenterBulkDraft {
+  return {
+    days: 30,
+    startDate: today()
+  };
+}
+
 type ReservationPreviewInput = Pick<
   AdminReservationDraft | ReservationRequest,
   "adults" | "checkIn" | "checkOut" | "children" | "roomSlug" | "status"
@@ -426,12 +457,15 @@ function getReservationPreview({
   };
 }
 
-export function AdminDashboard({ initialContent, initialImages, initialReservations }: AdminDashboardProps) {
+export function AdminDashboard({ initialContent, initialHotelCenter, initialImages, initialReservations }: AdminDashboardProps) {
   const router = useRouter();
   const [content, setContent] = useState(initialContent);
+  const [hotelCenter, setHotelCenter] = useState(initialHotelCenter);
   const [images, setImages] = useState(initialImages);
   const [reservations, setReservations] = useState(initialReservations);
   const [newReservation, setNewReservation] = useState<AdminReservationDraft>(() => createReservationDraft(initialContent.rooms));
+  const [hotelRateDraft, setHotelRateDraft] = useState<HotelCenterRateDraft>(() => createHotelRateDraft(initialContent.rooms));
+  const [hotelBulkDraft, setHotelBulkDraft] = useState<HotelCenterBulkDraft>(() => createHotelBulkDraft());
   const [activeTab, setActiveTab] = useState<AdminTab>("dashboard");
   const [selectedRoomIndex, setSelectedRoomIndex] = useState(0);
   const [roomSearch, setRoomSearch] = useState("");
@@ -447,6 +481,7 @@ export function AdminDashboard({ initialContent, initialImages, initialReservati
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState<"success" | "error">("success");
   const [isSaving, setIsSaving] = useState(false);
+  const [isSavingHotelCenter, setIsSavingHotelCenter] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [deletingImageSrc, setDeletingImageSrc] = useState<string | null>(null);
   const [isCreatingReservation, setIsCreatingReservation] = useState(false);
@@ -505,9 +540,10 @@ export function AdminDashboard({ initialContent, initialImages, initialReservati
       { label: "Tahmini gelir", value: formatBookingCurrency(dashboardMetrics.confirmedRevenue) },
       { label: "Ödenen", value: formatBookingCurrency(dashboardMetrics.paidRevenue) },
       { label: "Ödeme bekleyen", value: dashboardMetrics.pendingPayments },
-      { label: "Misafir", value: guestProfiles.length }
+      { label: "Misafir", value: guestProfiles.length },
+      { label: "Google fiyat", value: hotelCenter.rates.length }
     ];
-  }, [content.rooms.length, dashboardMetrics, guestProfiles.length]);
+  }, [content.rooms.length, dashboardMetrics, guestProfiles.length, hotelCenter.rates.length]);
 
   function flash(type: "success" | "error", text: string) {
     setMessageType(type);
@@ -556,6 +592,152 @@ export function AdminDashboard({ initialContent, initialImages, initialReservati
       flash("error", "İçerik kaydedilemedi. Bağlantıyı kontrol edip tekrar deneyin.");
     } finally {
       setIsSaving(false);
+    }
+  }
+
+  function updateHotelCenterSetting<K extends keyof HotelCenterSettings>(field: K, value: HotelCenterSettings[K]) {
+    setHotelCenter((current) => ({
+      ...current,
+      settings: {
+        ...current.settings,
+        [field]: value
+      }
+    }));
+  }
+
+  function updateHotelRateDraft<K extends keyof HotelCenterRateDraft>(field: K, value: HotelCenterRateDraft[K]) {
+    setHotelRateDraft((current) => {
+      const next = { ...current, [field]: value };
+
+      if (field === "roomSlug" && typeof value === "string") {
+        const room = content.rooms.find((item) => item.slug === value);
+
+        if (room) {
+          next.availableRooms = room.count;
+          next.pricePerNight = parseRoomPrice(room.price);
+        }
+      }
+
+      return next;
+    });
+  }
+
+  function updateHotelBulkDraft<K extends keyof HotelCenterBulkDraft>(field: K, value: HotelCenterBulkDraft[K]) {
+    setHotelBulkDraft((current) => ({ ...current, [field]: value }));
+  }
+
+  function upsertHotelRate(rate: HotelCenterRateDraft) {
+    const now = new Date().toISOString();
+    const nextRate: HotelCenterRate = {
+      ...rate,
+      availableRooms: Math.max(0, Math.round(rate.availableRooms)),
+      minNights: Math.max(1, Math.round(rate.minNights)),
+      pricePerNight: Math.max(0, Math.round(rate.pricePerNight)),
+      updatedAt: now
+    };
+
+    setHotelCenter((current) => {
+      const rates = [
+        ...current.rates.filter((item) => !(item.date === nextRate.date && item.roomSlug === nextRate.roomSlug)),
+        nextRate
+      ].sort((first, second) => first.date.localeCompare(second.date) || first.roomSlug.localeCompare(second.roomSlug));
+
+      return {
+        ...current,
+        rates,
+        updatedAt: now
+      };
+    });
+  }
+
+  function addHotelRate() {
+    if (!hotelRateDraft.roomSlug || !hotelRateDraft.date) {
+      flash("error", "Google fiyatı için oda ve tarih seçin.");
+      return;
+    }
+
+    upsertHotelRate(hotelRateDraft);
+    flash("success", "Google fiyat satırı eklendi. Canlıya yansıması için Google ayarlarını kaydedin.");
+  }
+
+  function removeHotelRate(date: string, roomSlug: string) {
+    setHotelCenter((current) => ({
+      ...current,
+      rates: current.rates.filter((rate) => !(rate.date === date && rate.roomSlug === roomSlug)),
+      updatedAt: new Date().toISOString()
+    }));
+  }
+
+  function generateHotelRates() {
+    const days = Math.max(1, Math.min(Math.round(hotelBulkDraft.days), hotelCenter.settings.maxAdvanceDays));
+    const now = new Date().toISOString();
+    const generatedRates: HotelCenterRate[] = [];
+
+    for (let index = 0; index < days; index += 1) {
+      const date = addDays(hotelBulkDraft.startDate, index);
+
+      if (!date) continue;
+
+      content.rooms.forEach((room) => {
+        generatedRates.push({
+          availableRooms: room.count,
+          closed: room.count <= 0,
+          date,
+          minNights: 1,
+          pricePerNight: parseRoomPrice(room.price),
+          roomSlug: room.slug,
+          updatedAt: now
+        });
+      });
+    }
+
+    setHotelCenter((current) => {
+      const generatedKeys = new Set(generatedRates.map((rate) => `${rate.date}:${rate.roomSlug}`));
+      const rates = [
+        ...current.rates.filter((rate) => !generatedKeys.has(`${rate.date}:${rate.roomSlug}`)),
+        ...generatedRates
+      ].sort((first, second) => first.date.localeCompare(second.date) || first.roomSlug.localeCompare(second.roomSlug));
+
+      return {
+        ...current,
+        rates,
+        updatedAt: now
+      };
+    });
+    flash("success", `${days} günlük Google fiyat takvimi hazırlandı. Kaydetmeyi unutmayın.`);
+  }
+
+  async function saveHotelCenter() {
+    setIsSavingHotelCenter(true);
+    setMessage("");
+
+    try {
+      const response = await fetch("/api/admin/hotel-center", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(hotelCenter)
+      });
+      const result = (await response.json().catch(() => ({}))) as {
+        error?: string;
+        hotelCenter?: HotelCenterData;
+        issues?: Array<{ path: string; message: string }>;
+      };
+
+      if (handleUnauthorized(response)) return;
+
+      if (!response.ok || !result.hotelCenter) {
+        const issue = result.issues?.[0];
+        flash("error", issue ? `${issue.path}: ${issue.message}` : result.error ?? "Google Hotel Center kaydedilemedi.");
+        return;
+      }
+
+      setHotelCenter(result.hotelCenter);
+      flash("success", "Google Hotel Center fiyat takvimi kaydedildi.");
+      router.refresh();
+    } catch {
+      flash("error", "Google Hotel Center kaydedilemedi. Bağlantıyı kontrol edin.");
+    } finally {
+      setIsSavingHotelCenter(false);
     }
   }
 
@@ -2284,6 +2466,356 @@ export function AdminDashboard({ initialContent, initialImages, initialReservati
     );
   }
 
+  function renderHotelCenter() {
+    const roomOptions = content.rooms.map((room) => [room.slug, room.title] as [string, string]);
+    const selectedRateRoom = content.rooms.find((room) => room.slug === hotelRateDraft.roomSlug) ?? content.rooms[0];
+    const visibleRates = hotelCenter.rates.slice(0, 120);
+    const feedBase = hotelCenter.settings.baseUrl.replace(/\/$/, "");
+    const feedLinks = [
+      ["Fiyat JSON", `${feedBase}/api/google-hotel-center/rates?days=90`],
+      ["Fiyat XML", `${feedBase}/api/google-hotel-center/rates?format=rates-xml&days=90`],
+      ["Müsaitlik XML", `${feedBase}/api/google-hotel-center/rates?format=inventory-xml&days=90`],
+      ["Oda/Paket XML", `${feedBase}/api/google-hotel-center/property-data`],
+      ["Otel Listesi", `${feedBase}/api/google-hotel-center/hotel-list`],
+      ["Landing Page", `${feedBase}/api/google-hotel-center/landing-pages`]
+    ];
+
+    return (
+      <div className="admin-section-stack" data-testid="admin-section-hotel-center">
+        <section className="admin-panel-section">
+          <div className="admin-section-heading">
+            <div>
+              <h2>Google Hotel Center</h2>
+              <span>Google fiyatları için tarih bazlı oda fiyatı, stok ve landing page bağlantıları.</span>
+            </div>
+            <button
+              className="admin-primary-button"
+              data-testid="admin-save-hotel-center"
+              disabled={isSavingHotelCenter}
+              type="button"
+              onClick={saveHotelCenter}
+            >
+              <Save size={16} />
+              {isSavingHotelCenter ? "Kaydediliyor" : "Google Ayarlarını Kaydet"}
+            </button>
+          </div>
+          <p className="admin-reservation-lock-note">
+            Google Hotel Center fiyat doğruluğu ister. Buraya girilen tarih bazlı fiyatlar aynı zamanda sitedeki rezervasyon
+            müsaitlik API'sinde kullanılır; Google'daki fiyat ile sitedeki fiyat aynı kalır.
+          </p>
+          <div className="admin-payment-metrics">
+            <div className="admin-payment-metric">
+              <span>Durum</span>
+              <strong>{hotelCenter.settings.enabled ? "Hazır" : "Hazırlanıyor"}</strong>
+            </div>
+            <div className="admin-payment-metric">
+              <span>Fiyat satırı</span>
+              <strong>{hotelCenter.rates.length}</strong>
+            </div>
+            <div className="admin-payment-metric">
+              <span>Oda tipi</span>
+              <strong>{content.rooms.length}</strong>
+            </div>
+            <div className="admin-payment-metric">
+              <span>Varsayılan kişi</span>
+              <strong>{hotelCenter.settings.defaultAdults} yetişkin</strong>
+            </div>
+          </div>
+        </section>
+
+        <section className="admin-panel-section">
+          <div className="admin-section-heading">
+            <h2>Bağlantı Ayarları</h2>
+            <span>Hotel Center hesabında property ve feed eşlemesi için kullanılacak bilgiler.</span>
+          </div>
+          <div className="admin-form-grid admin-form-grid--compact">
+            <SelectField
+              label="Google yayını"
+              testId="hotel-center-enabled"
+              value={hotelCenter.settings.enabled ? "true" : "false"}
+              onChange={(value) => updateHotelCenterSetting("enabled", value === "true")}
+              options={[
+                ["false", "Hazırlanıyor"],
+                ["true", "Aktif"]
+              ]}
+            />
+            <TextField
+              label="Google otel kodu"
+              value={hotelCenter.settings.hotelId}
+              onChange={(value) => updateHotelCenterSetting("hotelId", value)}
+            />
+            <TextField
+              label="Partner adı"
+              value={hotelCenter.settings.partnerName}
+              onChange={(value) => updateHotelCenterSetting("partnerName", value)}
+            />
+            <TextField
+              label="Partner anahtarı"
+              value={hotelCenter.settings.partnerKey}
+              onChange={(value) => updateHotelCenterSetting("partnerKey", value)}
+            />
+            <TextField
+              label="Satış noktası kodu"
+              value={hotelCenter.settings.pointOfSaleId}
+              onChange={(value) => updateHotelCenterSetting("pointOfSaleId", value)}
+            />
+            <TextField
+              label="Fiyat planı kodu"
+              value={hotelCenter.settings.ratePlanCode}
+              onChange={(value) => updateHotelCenterSetting("ratePlanCode", value)}
+            />
+            <TextField
+              label="Site adresi"
+              type="url"
+              value={hotelCenter.settings.baseUrl}
+              onChange={(value) => updateHotelCenterSetting("baseUrl", value)}
+            />
+            <TextField
+              label="Rezervasyon yolu"
+              value={hotelCenter.settings.landingPagePath}
+              onChange={(value) => updateHotelCenterSetting("landingPagePath", value)}
+            />
+            <NumberField
+              label="Varsayılan yetişkin"
+              min={1}
+              max={8}
+              value={hotelCenter.settings.defaultAdults}
+              onChange={(value) => updateHotelCenterSetting("defaultAdults", value)}
+            />
+            <NumberField
+              label="Maksimum ileri gün"
+              min={1}
+              max={730}
+              value={hotelCenter.settings.maxAdvanceDays}
+              onChange={(value) => updateHotelCenterSetting("maxAdvanceDays", value)}
+            />
+            <SelectField
+              label="Vergi durumu"
+              value={hotelCenter.settings.pricesIncludeTax ? "true" : "false"}
+              onChange={(value) => updateHotelCenterSetting("pricesIncludeTax", value === "true")}
+              options={[
+                ["true", "Fiyatlara vergi dahil"],
+                ["false", "Fiyatlara vergi hariç"]
+              ]}
+            />
+          </div>
+        </section>
+
+        <section className="admin-panel-section">
+          <div className="admin-section-heading">
+            <h2>Feed Linkleri</h2>
+            <span>Google Hotel Center hesabında veya entegrasyon servisinde kullanılacak bağlantılar.</span>
+          </div>
+          <div className="admin-feed-grid">
+            {feedLinks.map(([label, href]) => (
+              <a className="admin-feed-link" href={href} key={label} rel="noreferrer" target="_blank">
+                <strong>{label}</strong>
+                <span>{href}</span>
+              </a>
+            ))}
+          </div>
+        </section>
+
+        <section className="admin-panel-section">
+          <div className="admin-section-heading">
+            <h2>Toplu Takvim Oluştur</h2>
+            <span>Oda fiyatlarından Google takvimi üretir; sonradan özel günleri tek tek değiştirebilirsiniz.</span>
+          </div>
+          <div className="admin-form-grid admin-form-grid--compact">
+            <DateField
+              label="Başlangıç tarihi"
+              min={today()}
+              testId="hotel-center-bulk-start"
+              value={hotelBulkDraft.startDate}
+              onChange={(value) => updateHotelBulkDraft("startDate", value)}
+            />
+            <NumberField
+              label="Gün sayısı"
+              min={1}
+              max={hotelCenter.settings.maxAdvanceDays}
+              testId="hotel-center-bulk-days"
+              value={hotelBulkDraft.days}
+              onChange={(value) => updateHotelBulkDraft("days", value)}
+            />
+          </div>
+          <div className="admin-inline-actions">
+            <button className="admin-secondary-button" type="button" onClick={generateHotelRates}>
+              <CalendarCheck size={16} />
+              Mevcut Oda Fiyatlarıyla Oluştur
+            </button>
+          </div>
+        </section>
+
+        <section className="admin-panel-section">
+          <div className="admin-section-heading">
+            <h2>Fiyat Satırı Ekle</h2>
+            <span>Google'ın göreceği tarih bazlı oda fiyatı ve stok bilgisi.</span>
+          </div>
+          <div className="admin-form-grid admin-form-grid--compact">
+            <DateField
+              label="Tarih"
+              min={today()}
+              testId="hotel-center-rate-date"
+              value={hotelRateDraft.date}
+              onChange={(value) => updateHotelRateDraft("date", value)}
+            />
+            <SelectField
+              label="Oda"
+              testId="hotel-center-rate-room"
+              value={hotelRateDraft.roomSlug}
+              onChange={(value) => updateHotelRateDraft("roomSlug", value)}
+              options={roomOptions}
+            />
+            <NumberField
+              label="Gecelik fiyat"
+              min={0}
+              testId="hotel-center-rate-price"
+              value={hotelRateDraft.pricePerNight}
+              onChange={(value) => updateHotelRateDraft("pricePerNight", value)}
+            />
+            <NumberField
+              label="Müsait oda"
+              min={0}
+              max={selectedRateRoom?.count ?? 200}
+              testId="hotel-center-rate-rooms"
+              value={hotelRateDraft.availableRooms}
+              onChange={(value) => updateHotelRateDraft("availableRooms", value)}
+            />
+            <NumberField
+              label="Minimum gece"
+              min={1}
+              max={30}
+              testId="hotel-center-rate-min-nights"
+              value={hotelRateDraft.minNights}
+              onChange={(value) => updateHotelRateDraft("minNights", value)}
+            />
+            <SelectField
+              label="Satış durumu"
+              testId="hotel-center-rate-closed"
+              value={hotelRateDraft.closed ? "true" : "false"}
+              onChange={(value) => updateHotelRateDraft("closed", value === "true")}
+              options={[
+                ["false", "Satışa açık"],
+                ["true", "Satışa kapalı"]
+              ]}
+            />
+          </div>
+          <div className="admin-inline-actions">
+            <button className="admin-primary-button" data-testid="admin-add-hotel-rate" type="button" onClick={addHotelRate}>
+              <Plus size={16} />
+              Fiyat Satırını Ekle
+            </button>
+          </div>
+        </section>
+
+        <section className="admin-panel-section">
+          <div className="admin-section-heading">
+            <div>
+              <h2>Google Fiyat Takvimi</h2>
+              <span>İlk 120 satır gösteriliyor. Kaydedince Google feed'i bu veriden üretilir.</span>
+            </div>
+            <button
+              className="admin-danger-button"
+              disabled={hotelCenter.rates.length === 0}
+              type="button"
+              onClick={() => {
+                if (window.confirm("Google fiyat takvimi temizlensin mi?")) {
+                  setHotelCenter((current) => ({ ...current, rates: [], updatedAt: new Date().toISOString() }));
+                }
+              }}
+            >
+              <Trash2 size={16} />
+              Takvimi Temizle
+            </button>
+          </div>
+          {visibleRates.length === 0 ? (
+            <div className="admin-empty-state">Henüz Google fiyat satırı yok.</div>
+          ) : (
+            <div className="admin-reservation-table-wrap">
+              <table className="admin-reservation-table">
+                <thead>
+                  <tr>
+                    <th>Tarih</th>
+                    <th>Oda</th>
+                    <th>Fiyat</th>
+                    <th>Müsaitlik</th>
+                    <th>Minimum gece</th>
+                    <th>Durum</th>
+                    <th>İşlem</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {visibleRates.map((rate) => {
+                    const room = content.rooms.find((item) => item.slug === rate.roomSlug);
+
+                    return (
+                      <tr key={`${rate.date}-${rate.roomSlug}`}>
+                        <td>
+                          <strong>{formatDateLabel(rate.date)}</strong>
+                          <small>{rate.date}</small>
+                        </td>
+                        <td>
+                          <strong>{room?.title ?? rate.roomSlug}</strong>
+                          <small>{rate.roomSlug}</small>
+                        </td>
+                        <td>
+                          <strong>{formatBookingCurrency(rate.pricePerNight)}</strong>
+                          <small>gecelik</small>
+                        </td>
+                        <td>
+                          <strong>{rate.availableRooms}</strong>
+                          <small>{room?.count ?? 0} oda içinden</small>
+                        </td>
+                        <td>
+                          <strong>{rate.minNights}</strong>
+                          <small>gece</small>
+                        </td>
+                        <td>
+                          <span className={`admin-status-badge admin-status-badge--${rate.closed ? "danger" : "success"}`}>
+                            {rate.closed ? "Kapalı" : "Açık"}
+                          </span>
+                        </td>
+                        <td>
+                          <div className="admin-table-actions">
+                            <button
+                              className="admin-secondary-button"
+                              type="button"
+                              onClick={() =>
+                                setHotelRateDraft({
+                                  availableRooms: rate.availableRooms,
+                                  closed: rate.closed,
+                                  date: rate.date,
+                                  minNights: rate.minNights,
+                                  pricePerNight: rate.pricePerNight,
+                                  roomSlug: rate.roomSlug
+                                })
+                              }
+                            >
+                              <Pencil size={14} />
+                              Düzenle
+                            </button>
+                            <button
+                              className="admin-danger-button"
+                              type="button"
+                              onClick={() => removeHotelRate(rate.date, rate.roomSlug)}
+                            >
+                              <Trash2 size={14} />
+                              Sil
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      </div>
+    );
+  }
+
   function renderRooms() {
     const normalizedSearch = roomSearch.trim().toLocaleLowerCase("tr-TR");
     const visibleRooms = content.rooms
@@ -2927,12 +3459,18 @@ export function AdminDashboard({ initialContent, initialImages, initialReservati
             <button
               className="admin-primary-button"
               data-testid="admin-save"
-              disabled={isSaving}
+              disabled={activeTab === "hotelCenter" ? isSavingHotelCenter : isSaving}
               type="button"
-              onClick={saveContent}
+              onClick={activeTab === "hotelCenter" ? saveHotelCenter : saveContent}
             >
               <Save size={18} />
-              {isSaving ? "Kaydediliyor" : "Kaydet"}
+              {activeTab === "hotelCenter"
+                ? isSavingHotelCenter
+                  ? "Kaydediliyor"
+                  : "Google'ı Kaydet"
+                : isSaving
+                  ? "Kaydediliyor"
+                  : "Kaydet"}
             </button>
             <button className="admin-secondary-button" data-testid="admin-logout" type="button" onClick={logout}>
               <LogOut size={17} />
@@ -2953,6 +3491,7 @@ export function AdminDashboard({ initialContent, initialImages, initialReservati
         {activeTab === "rooms" ? renderRooms() : null}
         {activeTab === "reservations" ? renderReservations() : null}
         {activeTab === "payments" ? renderPayments() : null}
+        {activeTab === "hotelCenter" ? renderHotelCenter() : null}
         {activeTab === "guests" ? renderGuests() : null}
         {activeTab === "inbox" ? renderInbox() : null}
         {activeTab === "history" ? renderHistory() : null}
@@ -3077,18 +3616,27 @@ function DateField({
   label,
   min,
   onChange,
+  testId,
   value
 }: {
   disabled?: boolean;
   label: string;
   min?: string;
   onChange: (value: string) => void;
+  testId?: string;
   value: string;
 }) {
   return (
     <label className="admin-field">
       <span>{label}</span>
-      <input disabled={disabled} min={min} onChange={(event) => onChange(event.target.value)} type="date" value={value} />
+      <input
+        data-testid={testId}
+        disabled={disabled}
+        min={min}
+        onChange={(event) => onChange(event.target.value)}
+        type="date"
+        value={value}
+      />
     </label>
   );
 }
@@ -3099,6 +3647,7 @@ function NumberField({
   max,
   min = 0,
   onChange,
+  testId,
   value
 }: {
   disabled?: boolean;
@@ -3106,12 +3655,21 @@ function NumberField({
   max?: number;
   min?: number;
   onChange: (value: number) => void;
+  testId?: string;
   value: number;
 }) {
   return (
     <label className="admin-field">
       <span>{label}</span>
-      <input disabled={disabled} max={max} min={min} onChange={(event) => onChange(Number(event.target.value))} type="number" value={value} />
+      <input
+        data-testid={testId}
+        disabled={disabled}
+        max={max}
+        min={min}
+        onChange={(event) => onChange(Number(event.target.value))}
+        type="number"
+        value={value}
+      />
     </label>
   );
 }
@@ -3140,18 +3698,20 @@ function SelectField({
   label,
   onChange,
   options,
+  testId,
   value
 }: {
   disabled?: boolean;
   label: string;
   onChange: (value: string) => void;
   options: Array<[string, string]>;
+  testId?: string;
   value: string;
 }) {
   return (
     <label className="admin-field">
       <span>{label}</span>
-      <select disabled={disabled} onChange={(event) => onChange(event.target.value)} value={value}>
+      <select data-testid={testId} disabled={disabled} onChange={(event) => onChange(event.target.value)} value={value}>
         {options.map(([optionValue, labelText]) => (
           <option key={optionValue} value={optionValue}>
             {labelText}

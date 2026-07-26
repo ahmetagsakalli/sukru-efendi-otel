@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ZodError } from "zod";
 import { checkRateLimit } from "@/lib/rate-limit";
-import { formatBookingCurrency, getRoomAvailability, todayDateOnly } from "@/lib/booking";
+import { formatBookingCurrency, todayDateOnly } from "@/lib/booking";
+import { getHotelCenterData, getHotelCenterStayAvailability } from "@/lib/hotel-center";
 import { availabilityQuerySchema } from "@/lib/reservation-schema";
 import { listReservationRequests } from "@/lib/reservations";
 import { getSiteContent } from "@/lib/site-content";
@@ -35,6 +36,7 @@ export async function GET(request: NextRequest) {
     }
 
     const [content, reservations] = await Promise.all([getSiteContent(), listReservationRequests()]);
+    const hotelCenter = await getHotelCenterData(content);
     const rooms = input.roomSlug ? content.rooms.filter((room) => room.slug === input.roomSlug) : content.rooms;
 
     if (rooms.length === 0) {
@@ -42,7 +44,7 @@ export async function GET(request: NextRequest) {
     }
 
     const availability = rooms.map((room) => {
-      const item = getRoomAvailability(room, reservations, input.checkIn, input.checkOut);
+      const item = getHotelCenterStayAvailability(room, reservations, input.checkIn, input.checkOut, hotelCenter);
 
       return {
         ...item,

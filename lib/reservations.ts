@@ -33,6 +33,12 @@ type ReservationPaymentPatch = Partial<
   >
 >;
 
+type ReservationPricingPatch = Pick<ReservationRequest, "currency" | "estimatedTotal" | "nights" | "pricePerNight">;
+type ReservationAvailabilityGuard = (items: ReservationRequest[]) => {
+  isAvailable: boolean;
+  message?: string;
+};
+
 const contentDirectory = process.env.SITE_CONTENT_DIR
   ? path.resolve(process.env.SITE_CONTENT_DIR)
   : path.join(process.cwd(), "content");
@@ -209,6 +215,7 @@ function buildReservationRecord({
   createdAt,
   input,
   payment,
+  pricing: customPricing,
   room,
   source,
   status,
@@ -218,6 +225,7 @@ function buildReservationRecord({
   createdAt: string;
   input: AdminCreateReservationInput | CreateReservationRequestInput;
   payment?: ReservationPaymentPatch;
+  pricing?: ReservationPricingPatch;
   room: Room;
   source: "admin" | "website";
   status: ReservationRequest["status"];
@@ -234,7 +242,7 @@ function buildReservationRecord({
         nights,
         pricePerNight
       }
-    : getStayPricing(room, input.checkIn, input.checkOut);
+    : customPricing ?? getStayPricing(room, input.checkIn, input.checkOut);
 
   return reservationRequestSchema.parse({
     id,
@@ -258,11 +266,22 @@ function buildReservationRecord({
   });
 }
 
-export async function createReservationRequest(input: CreateReservationRequestInput, room: Room) {
+export async function createReservationRequest(
+  input: CreateReservationRequestInput,
+  room: Room,
+  pricing?: ReservationPricingPatch,
+  availabilityGuard?: ReservationAvailabilityGuard
+) {
   return withReservationMutation(async () => {
     const now = new Date().toISOString();
 
     const items = await readReservationFile();
+    const guardedAvailability = availabilityGuard?.(items);
+
+    if (guardedAvailability && !guardedAvailability.isAvailable) {
+      throw new ReservationConflictError(guardedAvailability.message);
+    }
+
     ensureCanBlockRoom({
       checkIn: input.checkIn,
       checkOut: input.checkOut,
@@ -275,6 +294,7 @@ export async function createReservationRequest(input: CreateReservationRequestIn
       createdAt: now,
       input,
       payment: getWebsitePaymentFields(now),
+      pricing,
       room,
       source: "website",
       status: getWebsiteReservationStatus(),

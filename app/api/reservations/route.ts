@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { ZodError } from "zod";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { formatBookingCurrency, todayDateOnly } from "@/lib/booking";
+import { getHotelCenterData, getHotelCenterStayAvailability, getHotelCenterStayPricing } from "@/lib/hotel-center";
 import { isPaymentCollectionEnabled } from "@/lib/payments";
 import { createReservationRequestSchema } from "@/lib/reservation-schema";
 import { createReservationRequest, ReservationConflictError, ReservationOccupancyError } from "@/lib/reservations";
@@ -57,14 +58,28 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Giriş tarihi bugünden önce olamaz." }, { status: 400 });
     }
 
-    const { rooms } = await getSiteContent();
+    const content = await getSiteContent();
+    const { rooms } = content;
     const room = rooms.find((item) => item.slug === input.roomSlug);
 
     if (!room) {
       return NextResponse.json({ error: "Seçilen oda bulunamadı." }, { status: 400 });
     }
 
-    const requestItem = await createReservationRequest(input, room);
+    const hotelCenter = await getHotelCenterData(content);
+    const pricing = getHotelCenterStayPricing(room, input.checkIn, input.checkOut, hotelCenter);
+    const requestItem = await createReservationRequest(input, room, pricing, (items) => {
+      const availability = getHotelCenterStayAvailability(room, items, input.checkIn, input.checkOut, hotelCenter);
+      const message =
+        availability.nights < availability.minNights
+          ? `Bu oda için seçilen tarihlerde minimum ${availability.minNights} gece konaklama gerekiyor.`
+          : "Seçilen tarih aralığında bu oda için müsaitlik yok.";
+
+      return {
+        isAvailable: availability.isAvailable,
+        message
+      };
+    });
     console.info("reservation_request_created", {
       id: requestItem.id,
       roomSlug: requestItem.roomSlug,

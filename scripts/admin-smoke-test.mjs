@@ -16,6 +16,7 @@ const tmpRoot = await fs.mkdtemp(path.join(os.tmpdir(), "sukru-admin-smoke-"));
 const tmpContentDir = path.join(tmpRoot, "content");
 const tmpContentFile = path.join(tmpContentDir, "site-content.json");
 const tmpReservationFile = path.join(tmpContentDir, "reservation-requests.json");
+const tmpHotelCenterFile = path.join(tmpContentDir, "google-hotel-center.json");
 const tmpAuthFile = path.join(tmpContentDir, ".admin-auth.json");
 const serverLogs = [];
 const uploadedPublicPaths = new Set();
@@ -97,6 +98,7 @@ async function setupIsolatedContent() {
 async function resetSmokeData() {
   await fs.copyFile(path.join(repoRoot, "content", "site-content.json"), tmpContentFile);
   await fs.rm(tmpReservationFile, { force: true });
+  await fs.rm(tmpHotelCenterFile, { force: true });
   await fs.rm(tmpAuthFile, { force: true });
 }
 
@@ -143,6 +145,7 @@ async function startServer() {
     PAYMENT_MOCK_SECRET: "admin-smoke-payment-secret-2026",
     PAYMENT_PROVIDER: "mock",
     PORT: String(port),
+    HOTEL_CENTER_FILE: tmpHotelCenterFile,
     SITE_CONTENT_DIR: tmpContentDir,
     SITE_CONTENT_FILE: tmpContentFile,
     RESERVATION_REQUESTS_FILE: tmpReservationFile,
@@ -444,6 +447,86 @@ async function checkDashboardShell(page) {
   await page.getByTestId("admin-tab-history").click();
   await expect(page.getByRole("heading", { level: 1, name: "Hareketler" })).toBeVisible();
   await page.getByTestId("admin-tab-dashboard").click();
+}
+
+async function checkHotelCenter(page, iteration) {
+  await page.getByTestId("admin-tab-hotelCenter").click();
+  await expect(page.getByRole("heading", { level: 1, name: "Google Hotel" })).toBeVisible();
+
+  const section = page.getByTestId("admin-section-hotel-center");
+  await expect(section).toBeVisible();
+  await section.getByTestId("hotel-center-enabled").selectOption("true");
+  await section.getByLabel("Google otel kodu").fill(`smoke-hotel-${iteration}`);
+  await section.getByLabel("Partner adı").fill(`Smoke Direct ${iteration}`);
+  await section.getByLabel("Partner anahtarı").fill(`smoke_partner_${iteration}`);
+  await section.getByLabel("Satış noktası kodu").fill(`direct_${iteration}`);
+  await section.getByLabel("Fiyat planı kodu").fill("BAR");
+  await section.getByLabel("Site adresi").fill(baseURL);
+  await section.getByTestId("hotel-center-bulk-start").fill("2026-08-10");
+  await section.getByTestId("hotel-center-bulk-days").fill("3");
+  await section.getByRole("button", { name: "Mevcut Oda Fiyatlarıyla Oluştur" }).click();
+  await expect(section.getByText("10 Ağu 2026").first()).toBeVisible();
+  await section.getByTestId("hotel-center-rate-date").fill("2026-08-15");
+  await section.getByTestId("hotel-center-rate-room").selectOption("suit-oda");
+  await section.getByTestId("hotel-center-rate-price").fill("4999");
+  await section.getByTestId("hotel-center-rate-rooms").fill("1");
+  await section.getByTestId("hotel-center-rate-min-nights").fill("2");
+  await section.getByTestId("hotel-center-rate-closed").selectOption("false");
+  await page.getByTestId("admin-add-hotel-rate").click();
+  await expect(section.getByText("15 Ağu 2026").first()).toBeVisible();
+
+  const [saveResponse] = await Promise.all([
+    page.waitForResponse((candidate) => candidate.url().endsWith("/api/admin/hotel-center") && candidate.request().method() === "POST"),
+    page.getByTestId("admin-save-hotel-center").click()
+  ]);
+
+  expect(saveResponse.ok(), `Hotel Center save failed with ${saveResponse.status()}`).toBeTruthy();
+  await expect(page.getByText("Google Hotel Center fiyat takvimi kaydedildi.")).toBeVisible();
+
+  const availability = await page.request.get(`${baseURL}/api/availability?checkIn=2026-08-15&checkOut=2026-08-17&roomSlug=suit-oda`);
+  expect(availability.ok(), `Calendar-priced availability failed with ${availability.status()}`).toBeTruthy();
+  const availabilityJson = await availability.json();
+  expect(availabilityJson.rooms?.[0]?.estimatedTotal).toBe(9599);
+
+  const tooShortReservation = await page.request.post(`${baseURL}/api/reservations`, {
+    headers: smokeClientHeaders(iteration, 22),
+    data: {
+      checkIn: "2026-08-15",
+      checkOut: "2026-08-16",
+      roomSlug: "suit-oda",
+      adults: 2,
+      children: 0,
+      name: `Min Gece Smoke ${iteration}`,
+      phone: "+90 555 120 30 40",
+      email: "",
+      note: "",
+      website: ""
+    }
+  });
+  expect(tooShortReservation.status()).toBe(409);
+  expect((await tooShortReservation.json()).error).toContain("minimum 2 gece");
+
+  const feed = await page.request.get(`${baseURL}/api/google-hotel-center/rates?from=2026-08-15&to=2026-08-16`);
+  expect(feed.ok(), `Hotel Center JSON feed failed with ${feed.status()}`).toBeTruthy();
+  const feedJson = await feed.json();
+  expect(feedJson.rows.some((row) => row.roomSlug === "suit-oda" && row.pricePerNight === 4999)).toBe(true);
+
+  const ratesXml = await page.request.get(`${baseURL}/api/google-hotel-center/rates?format=rates-xml&from=2026-08-15&to=2026-08-16`);
+  expect(ratesXml.ok(), `Hotel Center rate XML feed failed with ${ratesXml.status()}`).toBeTruthy();
+  expect(await ratesXml.text()).toContain("OTA_HotelRateAmountNotifRQ");
+
+  const propertyXml = await page.request.get(`${baseURL}/api/google-hotel-center/property-data`);
+  expect(propertyXml.ok(), `Hotel Center property XML feed failed with ${propertyXml.status()}`).toBeTruthy();
+  const propertyXmlText = await propertyXml.text();
+  expect(propertyXmlText).toContain("<RoomData>");
+  expect(propertyXmlText).toContain("<PackageData>");
+  expect(propertyXmlText).toContain(`partner="smoke_partner_${iteration}"`);
+
+  const landingXml = await page.request.get(`${baseURL}/api/google-hotel-center/landing-pages`);
+  expect(landingXml.ok(), `Hotel Center landing XML feed failed with ${landingXml.status()}`).toBeTruthy();
+  const landingXmlText = await landingXml.text();
+  expect(landingXmlText).toContain(`PointOfSale id="direct_${iteration}"`);
+  expect(landingXmlText).toContain("DisplayNames display_text=");
 }
 
 async function checkPayments(page, iteration) {
@@ -749,6 +832,7 @@ async function runIteration(browser, iteration, imageA, imageB, invalidImage) {
   await checkPaymentInfrastructure(page, iteration);
   await loginOrSetup(page);
   await checkDashboardShell(page);
+  await checkHotelCenter(page, iteration);
   await checkPayments(page, iteration);
   await checkOverview(page, imageA, iteration);
   await checkReservations(page, iteration);
