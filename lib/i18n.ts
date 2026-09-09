@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { getRoomCapacityLimit } from "@/lib/booking";
 import type { GalleryItem, Room, RoomFeature, SiteContent } from "@/lib/site-content-schema";
 
 export const publicLocales = ["tr", "en", "de"] as const;
@@ -233,47 +234,47 @@ export const publicCopy = {
     },
     bookingForm: {
       ariaLabel: "Rezervasyon",
-      checkIn: "Giriş",
-      checkOut: "Çıkış",
-      room: "Oda",
+      checkIn: "Giriş tarihiniz",
+      checkOut: "Çıkış tarihiniz",
+      room: "Odanız",
       adults: "Yetişkin",
       children: "Çocuk",
-      name: "Ad Soyad",
-      phone: "Telefon",
-      email: "E-posta",
-      note: "Not",
+      name: "Adınız ve soyadınız",
+      phone: "Telefon numaranız",
+      email: "E-posta adresiniz",
+      note: "Notunuz",
       website: "Web sitesi",
       capacityExceeded: "Kapasite aşıldı",
-      checkingAvailability: "Müsaitlik kontrol ediliyor",
-      availabilityFailed: "Müsaitlik alınamadı",
+      checkingAvailability: "Odalarımızın müsaitliğini kontrol ediyoruz.",
+      availabilityFailed: "Şu anda müsaitliği kontrol edemiyoruz. Lütfen tekrar deneyin.",
       unavailable: "Müsait oda yok",
-      unavailableSelected: "Seçilen tarih aralığında bu oda için müsaitlik yok.",
-      noAvailabilitySuggestion: "Farklı tarih veya oda seçin",
+      unavailableSelected: "Seçtiğiniz tarihlerde bu odamız dolu. Dilerseniz başka bir oda veya tarih seçebilirsiniz.",
+      noAvailabilitySuggestion: "Seçtiğiniz tarihlerde bu odamız dolu. Dilerseniz başka bir oda veya tarih seçebilirsiniz.",
       nights: "gece",
       roomsAvailable: "oda müsait",
       perNight: "gece",
       guests: "misafir",
-      submit: "Rezervasyonu Tamamla",
-      submitting: "Gönderiliyor",
-      chooseDate: "Uygun Tarih Seçin",
-      paymentRedirect: "Rezervasyon talebiniz alındı. Güvenli ödeme ekranına yönlendiriliyorsunuz.",
+      submit: "Rezervasyonunuzu tamamlayın",
+      submitting: "Rezervasyonunuzu alıyoruz…",
+      chooseDate: "Tarihlerinizi değiştirin",
+      paymentRedirect: "Rezervasyon talebinizi aldık. Sizi güvenli ödeme sayfasına yönlendiriyoruz.",
       paymentStartFailed:
-        "Rezervasyon talebiniz alındı ancak ödeme başlatılamadı. Otel kısa süre içinde sizinle iletişime geçecek.",
+        "Rezervasyon talebinizi aldık ancak ödemenizi başlatamadık. Sizinle kısa süre içinde iletişime geçeceğiz.",
       requestWithTotal:
-        "Talebiniz alındı. Talep no {id} · Tahmini toplam {total}. Otel kısa süre içinde sizinle iletişime geçecek.",
-      requestWithoutTotal: "Talebiniz alındı. Otel kısa süre içinde sizinle iletişime geçecek.",
+        "Rezervasyon talebinizi aldık. Talep numaranız {id}, tahmini konaklama tutarınız {total}. Sizinle kısa süre içinde iletişime geçeceğiz.",
+      requestWithoutTotal: "Rezervasyon talebinizi aldık. Sizinle kısa süre içinde iletişime geçeceğiz.",
       confirmedWithTotal:
-        "Rezervasyonunuz oluşturuldu. Rezervasyon no {id} · Tahmini toplam {total}. Otel gerekli durumda sizinle iletişime geçebilir.",
-      confirmedWithoutTotal: "Rezervasyonunuz oluşturuldu. Otel gerekli durumda sizinle iletişime geçebilir.",
-      requestFailed: "Talep gönderilemedi.",
-      connectionError: "Bağlantı kurulamadı. Lütfen telefon veya WhatsApp üzerinden bize ulaşın.",
-      occupancyError: "{room} için en fazla {capacity} misafir seçilebilir."
+        "Rezervasyonunuzu oluşturduk. Rezervasyon numaranız {id}, tahmini konaklama tutarınız {total}. Sizi ağırlamaktan mutluluk duyacağız.",
+      confirmedWithoutTotal: "Rezervasyonunuzu oluşturduk. Sizi ağırlamaktan mutluluk duyacağız.",
+      requestFailed: "Rezervasyon talebinizi şu anda alamıyoruz. Lütfen tekrar deneyin.",
+      connectionError: "Bağlantıda bir sorun yaşıyoruz. Bize telefon veya WhatsApp üzerinden ulaşabilirsiniz.",
+      occupancyError: "{room} seçeneğimizde en fazla {capacity} misafirimizi ağırlayabiliyoruz. Odanızı veya misafir sayınızı değiştirebilirsiniz."
     },
     bookingPage: {
       kicker: "Doğrudan rezervasyon",
-      title: "Müsait tarihleri seçin, odanızı güvenle ayırın.",
+      title: "Tarihi konağımızda sizi bekliyoruz.",
       body:
-        "Tarih, oda ve misafir bilgilerini seçtiğinizde sistem müsaitliği ve toplam tutarı anlık hesaplar. Rezervasyonunuz otelin paneline doğrudan düşer."
+        "Tarihlerinizi ve size uygun odayı seçerek rezervasyonunuzu yapabilirsiniz. Sorularınız için bize her zaman ulaşabilirsiniz."
     },
     rooms: {
       statsAria: "Oda sayıları",
@@ -389,22 +390,22 @@ export const publicCopy = {
       chooseDate: "Choose Available Dates",
       paymentRedirect: "Your reservation request has been received. Redirecting you to secure payment.",
       paymentStartFailed:
-        "Your reservation request was received, but payment could not be started. The hotel will contact you shortly.",
+        "Your reservation request was received, but payment could not be started. We will contact you shortly.",
       requestWithTotal:
-        "Your request has been received. Request no {id} · Estimated total {total}. The hotel will contact you shortly.",
-      requestWithoutTotal: "Your request has been received. The hotel will contact you shortly.",
+        "Your request has been received. Request no {id} · Estimated total {total}. We will contact you shortly.",
+      requestWithoutTotal: "Your request has been received. We will contact you shortly.",
       confirmedWithTotal:
-        "Your booking has been created. Booking no {id} · Estimated total {total}. The hotel may contact you if needed.",
-      confirmedWithoutTotal: "Your booking has been created. The hotel may contact you if needed.",
+        "Your booking has been created. Booking no {id} · Estimated total {total}. We look forward to welcoming you.",
+      confirmedWithoutTotal: "Your booking has been created. We look forward to welcoming you.",
       requestFailed: "The request could not be sent.",
       connectionError: "Could not connect. Please contact us by phone or WhatsApp.",
-      occupancyError: "{room} allows up to {capacity} guests."
+      occupancyError: "We can welcome up to {capacity} guests in our {room}. Please choose another room or adjust your guest count."
     },
     bookingPage: {
       kicker: "Direct booking",
       title: "Choose your dates and reserve your room securely.",
       body:
-        "Select dates, room and guests to check live availability and estimated total. Your booking is sent directly to the hotel panel."
+        "Choose your dates and room to book your stay with us. If you have any questions, we are here to help."
     },
     rooms: {
       statsAria: "Room counts",
@@ -520,22 +521,22 @@ export const publicCopy = {
       chooseDate: "Verfügbare Daten wählen",
       paymentRedirect: "Ihre Reservierungsanfrage wurde empfangen. Sie werden zur sicheren Zahlung weitergeleitet.",
       paymentStartFailed:
-        "Ihre Reservierungsanfrage wurde empfangen, aber die Zahlung konnte nicht gestartet werden. Das Hotel meldet sich in Kürze.",
+        "Ihre Reservierungsanfrage wurde empfangen, aber die Zahlung konnte nicht gestartet werden. Wir melden uns in Kürze bei Ihnen.",
       requestWithTotal:
-        "Ihre Anfrage wurde empfangen. Anfrage Nr. {id} · Geschätztsumme {total}. Das Hotel meldet sich in Kürze.",
-      requestWithoutTotal: "Ihre Anfrage wurde empfangen. Das Hotel meldet sich in Kürze.",
+        "Ihre Anfrage wurde empfangen. Anfrage Nr. {id} · Geschätztsumme {total}. Wir melden uns in Kürze bei Ihnen.",
+      requestWithoutTotal: "Ihre Anfrage wurde empfangen. Wir melden uns in Kürze bei Ihnen.",
       confirmedWithTotal:
-        "Ihre Reservierung wurde erstellt. Reservierungsnr. {id} · Geschätzte Summe {total}. Das Hotel kontaktiert Sie bei Bedarf.",
-      confirmedWithoutTotal: "Ihre Reservierung wurde erstellt. Das Hotel kontaktiert Sie bei Bedarf.",
+        "Ihre Reservierung wurde erstellt. Reservierungsnr. {id} · Geschätzte Summe {total}. Wir freuen uns auf Ihren Besuch.",
+      confirmedWithoutTotal: "Ihre Reservierung wurde erstellt. Wir freuen uns auf Ihren Besuch.",
       requestFailed: "Die Anfrage konnte nicht gesendet werden.",
       connectionError: "Keine Verbindung möglich. Bitte kontaktieren Sie uns per Telefon oder WhatsApp.",
-      occupancyError: "{room} erlaubt bis zu {capacity} Gäste."
+      occupancyError: "In unserem {room} können wir bis zu {capacity} Gäste beherbergen. Bitte wählen Sie ein anderes Zimmer oder passen Sie Ihre Gästezahl an."
     },
     bookingPage: {
       kicker: "Direkte Reservierung",
       title: "Wählen Sie Ihre Daten und reservieren Sie Ihr Zimmer sicher.",
       body:
-        "Wählen Sie Daten, Zimmer und Gäste aus, um Verfügbarkeit und geschätzte Summe direkt zu prüfen. Ihre Reservierung wird an das Hotelpanel gesendet."
+        "Wählen Sie Ihre Reisedaten und Ihr Zimmer, um Ihren Aufenthalt bei uns zu buchen. Bei Fragen sind wir gerne für Sie da."
     },
     rooms: {
       statsAria: "Zimmeranzahl",
@@ -972,52 +973,39 @@ export function interpolate(template: string, values: Record<string, string | nu
 }
 
 export function localizeSiteContent(content: SiteContent, locale: PublicLocale): SiteContent {
-  if (locale === defaultLocale) {
-    return content;
-  }
-
-  const patch = localizedContentPatches[locale as Exclude<PublicLocale, "tr">];
+  if (locale === defaultLocale) return content;
+  const language = locale as "en" | "de";
+  const patch = localizedContentPatches[language];
+  const saved = content.translations?.[language];
 
   return {
     ...content,
-    site: {
-      ...content.site,
-      description: patch.siteDescription
-    },
-    services: patch.services,
-    roomFeatures: content.roomFeatures.map((feature) => ({
+    site: { ...content.site, description: saved?.siteDescription ?? patch.siteDescription },
+    services: content.services.map((service, index) => saved?.services?.[index] ?? patch.services[index] ?? service),
+    roomFeatures: content.roomFeatures.map((feature, index) => ({
       ...feature,
-      ...(patch.roomFeatures[feature.icon] ?? {})
+      ...(saved?.roomFeatures?.[index] ?? patch.roomFeatures[feature.icon] ?? {})
     })),
     rooms: content.rooms.map((room) => ({
       ...room,
-      ...(patch.rooms[room.slug] ?? {}),
-      amenities: patch.rooms[room.slug]?.amenities ?? room.amenities
+      ...(saved?.rooms?.find((item) => item.slug === room.slug) ?? patch.rooms[room.slug] ?? {}),
+      capacity: language === "en" ? "Up to " + getRoomCapacityLimit(room) + " guests" : "Bis zu " + getRoomCapacityLimit(room) + " Gäste"
     })),
     galleryItems: content.galleryItems.map((item) => ({
       ...item,
-      title: patch.galleryItems[item.image] ?? item.title
+      title: saved?.galleryItems?.find((translated) => translated.image === item.image)?.title ?? patch.galleryItems[item.image] ?? item.title
     })),
     pages: {
       home: {
-        ...content.pages.home,
-        ...patch.pages.home
+        ...content.pages.home, ...patch.pages.home, ...saved?.pages?.home,
+        heroImage: content.pages.home.heroImage, historyImage: content.pages.home.historyImage
       },
-      rooms: {
-        ...content.pages.rooms,
-        ...patch.pages.rooms
-      },
-      gallery: {
-        ...content.pages.gallery,
-        ...patch.pages.gallery
-      },
-      contact: {
-        ...content.pages.contact,
-        ...patch.pages.contact
-      },
+      rooms: { ...content.pages.rooms, ...patch.pages.rooms, ...saved?.pages?.rooms },
+      gallery: { ...content.pages.gallery, ...patch.pages.gallery, ...saved?.pages?.gallery },
+      contact: { ...content.pages.contact, ...patch.pages.contact, ...saved?.pages?.contact },
       history: {
-        ...content.pages.history,
-        ...patch.pages.history
+        ...content.pages.history, ...patch.pages.history, ...saved?.pages?.history,
+        image: content.pages.history.image
       }
     }
   };

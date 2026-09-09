@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Montserrat, Playfair_Display, Roboto } from "next/font/google";
+import { Playfair_Display } from "next/font/google";
 import { headers } from "next/headers";
 import type { ReactNode } from "react";
 import { FloatingContacts } from "@/components/FloatingContacts";
@@ -9,24 +9,11 @@ import { getLocaleFromPathname } from "@/lib/i18n";
 import { getSiteContent } from "@/lib/site-content";
 import "./globals.css";
 
-const bodyFont = Roboto({
+const bodyFont = Playfair_Display({
   subsets: ["latin", "latin-ext"],
-  weight: ["300", "400", "500", "700"],
+  weight: ["400", "500", "600", "700", "800", "900"],
+  style: ["normal", "italic"],
   variable: "--font-body",
-  display: "swap"
-});
-
-const headingFont = Playfair_Display({
-  subsets: ["latin", "latin-ext"],
-  weight: ["400", "500", "600", "700", "900"],
-  variable: "--font-heading",
-  display: "swap"
-});
-
-const accentFont = Montserrat({
-  subsets: ["latin", "latin-ext"],
-  weight: ["400", "500", "600", "700"],
-  variable: "--font-accent",
   display: "swap"
 });
 
@@ -82,8 +69,13 @@ export async function generateMetadata(): Promise<Metadata> {
     },
     category: "hotel",
     icons: {
-      icon: "/favicon.svg",
-      shortcut: "/favicon.svg"
+      icon: [
+        { url: "/icons/favicon-16.png", sizes: "16x16", type: "image/png" },
+        { url: "/favicon.png", sizes: "32x32", type: "image/png" },
+        { url: "/icons/favicon-48.png", sizes: "48x48", type: "image/png" }
+      ],
+      shortcut: "/favicon.png",
+      apple: { url: "/icons/apple-touch-icon.png", sizes: "180x180", type: "image/png" }
     },
     manifest: "/manifest.webmanifest"
   };
@@ -106,8 +98,8 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
   const content = isAdminRoute ? null : await getSiteContent();
 
   return (
-    <html lang={locale}>
-      <body className={`${bodyFont.variable} ${headingFont.variable} ${accentFont.variable}`}>
+    <html lang={locale} className={bodyFont.variable}>
+      <body>
         {isAdminRoute ? null : <Header locale={locale} />}
         <main>{children}</main>
         {content ? <Footer content={content} locale={locale} /> : null}

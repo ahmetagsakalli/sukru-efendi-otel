@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { MAX_ADULTS, MAX_CHILDREN } from "@/lib/booking-limits";
 
 function isValidDateOnly(value: string) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
@@ -48,8 +49,8 @@ export const createReservationRequestSchema = z
     checkIn: dateSchema,
     checkOut: dateSchema,
     roomSlug: z.string().trim().min(2, "Oda seçimi eksik.").max(90, "Oda seçimi geçersiz."),
-    adults: z.coerce.number().int("Yetişkin sayısı geçersiz.").min(1, "En az 1 yetişkin seçilmeli.").max(8, "Yetişkin sayısı çok yüksek."),
-    children: z.coerce.number().int("Çocuk sayısı geçersiz.").min(0, "Çocuk sayısı geçersiz.").max(8, "Çocuk sayısı çok yüksek."),
+    adults: z.coerce.number().int("Yetişkin sayısı geçersiz.").min(1, "En az 1 yetişkin seçilmeli.").max(MAX_ADULTS, "Yetişkin sayısı çok yüksek."),
+    children: z.coerce.number().int("Çocuk sayısı geçersiz.").min(0, "Çocuk sayısı geçersiz.").max(MAX_CHILDREN, "Çocuk sayısı çok yüksek."),
     name: z.string().trim().min(2, "Ad soyad en az 2 karakter olmalı.").max(120, "Ad soyad çok uzun."),
     phone: z
       .string()
@@ -82,8 +83,8 @@ export const adminCreateReservationSchema = z
     checkIn: dateSchema,
     checkOut: dateSchema,
     roomSlug: z.string().trim().min(2, "Oda seçimi eksik.").max(90, "Oda seçimi geçersiz."),
-    adults: z.coerce.number().int("Yetişkin sayısı geçersiz.").min(1, "En az 1 yetişkin seçilmeli.").max(8, "Yetişkin sayısı çok yüksek."),
-    children: z.coerce.number().int("Çocuk sayısı geçersiz.").min(0, "Çocuk sayısı geçersiz.").max(8, "Çocuk sayısı çok yüksek."),
+    adults: z.coerce.number().int("Yetişkin sayısı geçersiz.").min(1, "En az 1 yetişkin seçilmeli.").max(MAX_ADULTS, "Yetişkin sayısı çok yüksek."),
+    children: z.coerce.number().int("Çocuk sayısı geçersiz.").min(0, "Çocuk sayısı geçersiz.").max(MAX_CHILDREN, "Çocuk sayısı çok yüksek."),
     name: z.string().trim().min(2, "Ad soyad en az 2 karakter olmalı.").max(120, "Ad soyad çok uzun."),
     phone: z
       .string()
@@ -112,8 +113,8 @@ export const reservationRequestSchema = z.object({
   checkOut: dateSchema,
   roomSlug: z.string().trim().min(2).max(90),
   roomTitle: z.string().trim().min(1).max(120),
-  adults: z.number().int().min(1).max(8),
-  children: z.number().int().min(0).max(8),
+  adults: z.number().int().min(1).max(MAX_ADULTS),
+  children: z.number().int().min(0).max(MAX_CHILDREN),
   name: z.string().trim().min(2).max(120),
   phone: z.string().trim().min(7).max(40),
   email: emailValueSchema.default(""),
@@ -142,8 +143,8 @@ export const updateReservationRequestSchema = z
     checkIn: dateSchema,
     checkOut: dateSchema,
     roomSlug: z.string().trim().min(2, "Oda seçimi eksik.").max(90, "Oda seçimi geçersiz."),
-    adults: z.coerce.number().int("Yetişkin sayısı geçersiz.").min(1, "En az 1 yetişkin seçilmeli.").max(8, "Yetişkin sayısı çok yüksek."),
-    children: z.coerce.number().int("Çocuk sayısı geçersiz.").min(0, "Çocuk sayısı geçersiz.").max(8, "Çocuk sayısı çok yüksek."),
+    adults: z.coerce.number().int("Yetişkin sayısı geçersiz.").min(1, "En az 1 yetişkin seçilmeli.").max(MAX_ADULTS, "Yetişkin sayısı çok yüksek."),
+    children: z.coerce.number().int("Çocuk sayısı geçersiz.").min(0, "Çocuk sayısı geçersiz.").max(MAX_CHILDREN, "Çocuk sayısı çok yüksek."),
     name: z.string().trim().min(2, "Ad soyad en az 2 karakter olmalı.").max(120, "Ad soyad çok uzun."),
     phone: z
       .string()

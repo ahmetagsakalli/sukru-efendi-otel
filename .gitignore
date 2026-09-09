@@ -1,11 +1,11 @@
 .next/
+.next-admin-smoke/
 .vercel/
 node_modules/
 out/
 dist/
 .env*
 !.env.example
-content/.admin-auth.json
 content/backups/
 content/reservation-backups/
 content/reservation-requests.json

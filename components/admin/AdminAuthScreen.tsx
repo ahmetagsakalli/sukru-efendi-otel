@@ -3,6 +3,22 @@
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { LockKeyhole, LogIn, ShieldCheck } from "lucide-react";
+import "./admin.css";
+
+function AuthStory() {
+  return (
+    <aside className="admin-auth-story">
+      <strong>Şükrü Efendi Ottoman Hotel</strong>
+      <div>
+        <h2>İyi bir konaklama, özenli bir hazırlıkla başlar.</h2>
+        <p>
+          Odalarınızı, rezervasyonlarınızı ve web sitenizi tek yerden yönetin.
+        </p>
+      </div>
+      <a href="/">← Web sitesine dönün</a>
+    </aside>
+  );
+}
 
 type AdminAuthScreenProps = {
   mode: "login" | "setup" | "locked";
@@ -19,13 +35,17 @@ export function AdminAuthScreen({ mode }: AdminAuthScreenProps) {
   if (mode === "locked") {
     return (
       <div className="admin-auth">
+        <AuthStory />
         <div className="admin-auth-card">
           <div className="admin-auth-icon">
             <LockKeyhole />
           </div>
           <p className="admin-kicker">Şükrü Efendi Yönetim</p>
           <h1>Yönetim paneli yapılandırması gerekiyor</h1>
-          <p className="admin-auth-note">Canlı ortamda parola kurulumu ortam değişkeni olmadan kapalı.</p>
+          <p className="admin-auth-note">
+            Yönetici erişimi henüz etkinleştirilmemiş. Site yöneticinizden
+            kurulumu tamamlamasını isteyin.
+          </p>
         </div>
       </div>
     );
@@ -42,28 +62,40 @@ export function AdminAuthScreen({ mode }: AdminAuthScreenProps) {
 
     setIsSubmitting(true);
 
-    const response = await fetch(isSetup ? "/api/admin/setup" : "/api/admin/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ password })
-    });
-    const result = (await response.json().catch(() => ({}))) as { error?: string };
+    try {
+      const response = await fetch(
+        isSetup ? "/api/admin/setup" : "/api/admin/login",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ password }),
+        },
+      );
+      const result = (await response.json().catch(() => ({}))) as {
+        error?: string;
+      };
 
-    setIsSubmitting(false);
+      if (!response.ok) {
+        setMessage(result.error ?? "İşlem tamamlanamadı.");
+        return;
+      }
 
-    if (!response.ok) {
-      setMessage(result.error ?? "İşlem tamamlanamadı.");
-      return;
+      router.replace("/admin");
+      router.refresh();
+    } catch {
+      setMessage("Bağlantı kurulamadı. Lütfen tekrar deneyin.");
+    } finally {
+      setIsSubmitting(false);
     }
-
-    router.replace("/admin");
-    router.refresh();
   }
 
   return (
     <div className="admin-auth">
+      <AuthStory />
       <form className="admin-auth-card" onSubmit={handleSubmit}>
-        <div className="admin-auth-icon">{isSetup ? <ShieldCheck /> : <LockKeyhole />}</div>
+        <div className="admin-auth-icon">
+          {isSetup ? <ShieldCheck /> : <LockKeyhole />}
+        </div>
         <p className="admin-kicker">Şükrü Efendi Yönetim</p>
         <h1>{isSetup ? "Panel parolası oluştur" : "Yönetim paneline giriş"}</h1>
         <label className="admin-field">
@@ -91,12 +123,26 @@ export function AdminAuthScreen({ mode }: AdminAuthScreenProps) {
           </label>
         ) : null}
         {isSetup ? (
-          <p className="admin-auth-note">En az 10 karakter, küçük harf, rakam ve sembol kullan.</p>
+          <p className="admin-auth-note">
+            En az 10 karakter, küçük harf, rakam ve sembol kullanın.
+          </p>
         ) : null}
-        {message ? <p className="admin-alert admin-alert--error">{message}</p> : null}
-        <button className="admin-primary-button" disabled={isSubmitting} type="submit">
+        {message ? (
+          <p role="alert" className="admin-alert admin-alert--error">
+            {message}
+          </p>
+        ) : null}
+        <button
+          className="admin-primary-button"
+          disabled={isSubmitting}
+          type="submit"
+        >
           <LogIn size={18} />
-          {isSubmitting ? "Kontrol ediliyor" : isSetup ? "Paneli başlat" : "Giriş yap"}
+          {isSubmitting
+            ? "Kontrol ediliyor"
+            : isSetup
+              ? "Paneli başlat"
+              : "Giriş yap"}
         </button>
       </form>
     </div>

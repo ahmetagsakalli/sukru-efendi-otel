@@ -1,0 +1,367 @@
+.selectTrigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  border: 0;
+  border-radius: 2px;
+  padding: 0;
+  background: transparent;
+  color: #263e35;
+  text-align: left;
+  font-family: var(--font-body), Georgia, serif;
+  font-size: 21px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.selectTrigger > span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.selectTrigger:focus-visible,
+.dateTrigger:focus-visible {
+  outline: 2px solid #ab8a50;
+  outline-offset: 4px;
+}
+.selectTrigger:disabled,
+.dateTrigger:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+.triggerChevron {
+  color: #9a8969;
+  flex-shrink: 0;
+  transition: transform 0.18s;
+}
+.selectTrigger[data-state="open"] .triggerChevron {
+  transform: rotate(180deg);
+}
+.numberTrigger {
+  font-size: 28px;
+}
+
+/* Portals are outside the booking card, so their theme is explicit. */
+.panel {
+  z-index: 110;
+  color-scheme: light;
+  color: #263e35;
+  background: #fcfaf5;
+  border: 1px solid #c7b48d;
+  border-radius: 5px;
+  box-shadow:
+    0 16px 42px -10px #1c302c40,
+    0 2px 8px #1c302c0d;
+  font-family: var(--font-body), Georgia, serif;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+.panel[data-state="open"] {
+  animation: panelEnter 0.16s ease-out;
+}
+.panel:focus {
+  outline: none;
+}
+.roomPanel {
+  width: 356px;
+  max-width: calc(100vw - 24px);
+  max-height: var(--radix-select-content-available-height);
+}
+.numberPanel {
+  width: 174px;
+  max-width: calc(100vw - 24px);
+  max-height: min(320px, var(--radix-select-content-available-height));
+}
+.options {
+  padding: 7px;
+}
+.option {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  min-height: 85px;
+  padding: 11px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  position: relative;
+  cursor: pointer;
+  user-select: none;
+  outline: none;
+}
+.option + .option {
+  margin-top: 3px;
+}
+.option[data-state="checked"] {
+  background: #edf0e8;
+  border-color: #d9dfd0;
+}
+.option[data-highlighted] {
+  background: #f1eadb;
+  border-color: #c5ac7d;
+}
+.option[data-disabled] {
+  opacity: 0.45;
+  pointer-events: none;
+}
+.roomImage {
+  width: 58px;
+  height: 62px;
+  flex-shrink: 0;
+  border-radius: 2px;
+  object-fit: cover;
+}
+.optionCopy {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  gap: 5px;
+  min-width: 0;
+}
+.optionTitle {
+  display: block;
+  color: #263e35;
+  font-family: var(--font-body), Georgia, serif;
+  font-size: 20px;
+  line-height: 1.25;
+}
+.optionDescription {
+  font-size: 11px;
+  line-height: 1.5;
+  color: #717464;
+}
+.selectionMark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  color: #fffaf0;
+  border: 1px solid #d9d4c4;
+  border-radius: 50%;
+}
+.option[data-state="checked"] .selectionMark {
+  border-color: #3e5645;
+  background: #3e5645;
+}
+.numberOption {
+  min-height: 49px;
+  padding: 8px 12px;
+  gap: 12px;
+}
+.numberOption .optionCopy {
+  flex-direction: row;
+  align-items: baseline;
+  gap: 9px;
+}
+.numberOption .optionTitle {
+  font-size: 23px;
+}
+/* Reserve space so appearing scroll arrows cannot move an option under the pointer. */
+.scrollButtonSlot {
+  height: 28px;
+  flex-shrink: 0;
+  background: #f2eee3;
+}
+.scrollButton {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 28px;
+  background: #f2eee3;
+  color: #8e7852;
+}
+
+.dateField {
+  padding: 0 !important;
+}
+.dateTrigger {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  padding: 18px 17px 17px;
+  color: #263e35;
+  cursor: pointer;
+  border-radius: 2px;
+}
+.calendarPanel {
+  width: 344px;
+  max-width: calc(100vw - 24px);
+  max-height: var(--radix-popover-content-available-height);
+  padding: 10px 17px 18px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.calendarHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+  padding-bottom: 9px;
+  border-bottom: 1px solid #e5dfd1;
+  color: #777563;
+  font-size: 12px;
+}
+.closeButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #847252;
+  border-radius: 3px;
+  width: 32px;
+  height: 32px;
+  cursor: pointer;
+}
+.closeButton:hover {
+  background: #eee7d8;
+}
+.panel .calendar {
+  --rdp-accent-color: #263e35;
+  --rdp-accent-background-color: #ebe5d7;
+  --rdp-day-width: min(44px, calc((100vw - 60px) / 7));
+  --rdp-day-height: 42px;
+  --rdp-day_button-width: min(40px, calc((100vw - 66px) / 7));
+  --rdp-day_button-height: 38px;
+  --rdp-day_button-border-radius: 3px;
+  --rdp-selected-border: 1px solid #263e35;
+  --rdp-nav_button-width: 36px;
+  --rdp-nav_button-height: 36px;
+  --rdp-nav-height: 44px;
+  --rdp-today-color: #89703f;
+  --rdp-outside-opacity: 0.45;
+  --rdp-disabled-opacity: 0.3;
+  --rdp-weekday-padding: 12px 0 8px;
+  margin: 0;
+  width: 100%;
+  font-size: 13px;
+}
+.calendar :global(.rdp-months) {
+  max-width: none;
+  width: 100%;
+}
+.calendar :global(.rdp-month) {
+  width: 100%;
+}
+.calendar :global(.rdp-month_grid) {
+  width: 100%;
+  table-layout: fixed;
+}
+.calendar :global(.rdp-month_caption) {
+  justify-content: center;
+}
+.calendar :global(.rdp-caption_label) {
+  font-family: var(--font-body), Georgia, serif;
+  font-size: 22px;
+  font-weight: 400;
+  color: #263e35;
+}
+.calendar :global(.rdp-button_previous),
+.calendar :global(.rdp-button_next) {
+  border: 1px solid #ded7c7;
+  border-radius: 3px;
+}
+.calendar :global(.rdp-button_previous):hover:not(:disabled),
+.calendar :global(.rdp-button_next):hover:not(:disabled) {
+  background: #eee7d8;
+}
+.calendar :global(.rdp-chevron) {
+  width: 17px;
+  height: 17px;
+  fill: #8e7852;
+}
+.calendar :global(.rdp-weekday) {
+  font-size: 10px;
+  font-weight: 400;
+  color: #747767;
+  opacity: 1;
+}
+.calendar :global(.rdp-day_button) {
+  margin-inline: auto;
+  font-size: 13px;
+  font-weight: 400;
+  transition: background 0.12s;
+}
+.calendar :global(.rdp-day_button):hover:not(:disabled) {
+  background: #ece5d5;
+}
+.calendar :global(.rdp-day_button):focus-visible {
+  outline: 2px solid #b99d62;
+  outline-offset: 1px;
+}
+.calendar :global(.rdp-selected) :global(.rdp-day_button) {
+  background: #263e35;
+  color: #fffaf0;
+  font-weight: 500;
+}
+.calendar :global(.rdp-selected) :global(.rdp-day_button):hover {
+  background: #3b5345;
+}
+.calendar
+  :global(.rdp-today):not(:global(.rdp-selected))
+  :global(.rdp-day_button) {
+  border: 1px solid #bca678;
+}
+.stayDay:not(:global(.rdp-disabled)) {
+  background: #eeeadf;
+}
+.arrivalDay:not(:global(.rdp-selected)) :global(.rdp-day_button),
+.departureDay:not(:global(.rdp-selected)) :global(.rdp-day_button) {
+  background: #e6e9df;
+}
+
+@keyframes panelEnter {
+  from {
+    opacity: 0;
+    transform: translateY(-3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@media (max-width: 1250px) {
+  .dateTrigger {
+    padding: 14px 20px;
+  }
+}
+@media (max-width: 640px) {
+  .selectTrigger {
+    font-size: 19px;
+    gap: 6px;
+  }
+  .numberTrigger {
+    font-size: 25px;
+  }
+  .dateTrigger {
+    padding: 15px 12px;
+  }
+  .option {
+    gap: 10px;
+    padding: 10px;
+  }
+  .roomImage {
+    width: 48px;
+    height: 56px;
+  }
+  .optionTitle {
+    font-size: 18px;
+  }
+  .optionDescription {
+    font-size: 10px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .panel,
+  .triggerChevron,
+  .calendar :global(.rdp-day_button) {
+    animation: none;
+    transition: none;
+  }
+}

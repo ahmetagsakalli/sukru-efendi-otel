@@ -1,4 +1,5 @@
-import { getRoomCapacityLimit, parseDateOnly, todayDateOnly } from "@/lib/booking";
+import { parseDateOnly, todayDateOnly } from "@/lib/booking";
+import { MAX_ADULTS, MAX_CHILDREN } from "@/lib/booking-limits";
 import { getOriginalRoomSlug, getOriginalRoomSlugFromAnyLocale, type PublicLocale } from "@/lib/i18n";
 import type { Room } from "@/lib/site-content-schema";
 
@@ -92,11 +93,10 @@ export function getBookingInitialValues(
   }
 
   if (selectedRoom) {
-    const capacityLimit = getRoomCapacityLimit(selectedRoom);
     const hasAdultParam = Boolean(firstParam(searchParams, queryAliases.adults));
     const hasChildParam = Boolean(firstParam(searchParams, queryAliases.children));
-    const adults = clampNumber(firstParam(searchParams, queryAliases.adults), 1, capacityLimit);
-    const children = clampNumber(firstParam(searchParams, queryAliases.children), 0, Math.max(capacityLimit - adults, 0));
+    const adults = clampNumber(firstParam(searchParams, queryAliases.adults) || "2", 1, MAX_ADULTS);
+    const children = clampNumber(firstParam(searchParams, queryAliases.children), 0, MAX_CHILDREN);
 
     if (hasAdultParam || hasChildParam) {
       result.adults = String(adults);

@@ -3,6 +3,7 @@ import path from "node:path";
 import sharp from "sharp";
 
 const publicDir = path.join(process.cwd(), "public");
+const iconsDir = path.join(publicDir, "icons");
 const imageExtensions = new Set([".jpg", ".jpeg", ".png", ".webp"]);
 
 async function collectImages(directory) {
@@ -10,6 +11,11 @@ async function collectImages(directory) {
   const files = await Promise.all(
     entries.map(async (entry) => {
       const entryPath = path.join(directory, entry.name);
+
+      // Browser and home-screen icons must retain their PNG format and URLs.
+      if (entryPath === iconsDir || entryPath === path.join(publicDir, "favicon.png")) {
+        return [];
+      }
 
       if (entry.isDirectory()) {
         return collectImages(entryPath);

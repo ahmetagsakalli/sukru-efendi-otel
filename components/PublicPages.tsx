@@ -56,7 +56,7 @@ export async function PublicHomePage({ locale }: { locale: PublicLocale }) {
           </div>
         </div>
       </section>
-      <BookingForm rooms={rooms} locale={locale} />
+      <BookingForm rooms={rooms} locale={locale} settings={content.booking} hotelName={content.site.shortName} />
       <section className="section rooms-section" id="odalar">
         <div className="section-title">
           <h2>{copy.home.roomsTitle}</h2>
@@ -121,10 +121,12 @@ export async function PublicBookingPage({
 
   return (
     <div className="page-transition">
-      <PageIntro kicker={copy.bookingPage.kicker} title={copy.bookingPage.title}>
+      <PageIntro kicker="" title={copy.bookingPage.title}>
         {copy.bookingPage.body}
       </PageIntro>
       <BookingForm
+        settings={content.booking}
+        hotelName={content.site.shortName}
         rooms={rooms}
         locale={locale}
         initialValues={initialValues}
